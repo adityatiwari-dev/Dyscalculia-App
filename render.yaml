@@ -4,7 +4,7 @@ services:
     name: numberbuddies-backend
     plan: free
     runtime: docker
-    rootDirectory: phase2-backend
+    rootDir: phase2-backend
     dockerfilePath: Dockerfile
     healthCheckPath: /api/v2/health
 
