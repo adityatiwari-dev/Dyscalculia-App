@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import client from '../api/client'
+import client from '../api/springClient'
 import { setToken, setUser } from '../auth'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorBanner from '../components/ErrorBanner'
@@ -61,21 +61,18 @@ export default function Register() {
       setMessage('Registered and logged in')
       navigate('/', { replace: true })
     } catch (err) {
-  console.log('REGISTER ERROR FULL 👉', err)
-  console.log('REGISTER ERROR RESPONSE 👉', err.response)
-  console.log('REGISTER ERROR DATA 👉', err.response?.data)
+      console.error('Registration failed:', err)
 
-  if (err?.clientValidation) {
-    setError(err.message)
-  } else {
-    setError(
-      err.response?.data?.message ||
-      JSON.stringify(err.response?.data) ||
-      'Registration failed'
-    )
-  }
-}
-finally {
+      if (err?.clientValidation) {
+        setError(err.message)
+      } else {
+        setError(
+          err.response?.data?.message ||
+          JSON.stringify(err.response?.data) ||
+          'Registration failed'
+        )
+      }
+    } finally {
       setLoading(false)
     }
   }

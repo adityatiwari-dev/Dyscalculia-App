@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
-import client from '../api/client'
+import client from '../api/springClient'
 import { getUser } from '../auth'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorBanner from '../components/ErrorBanner'
 import { useNavigate } from 'react-router-dom'
+import { syncAssessmentToPhase2 } from '../utils/assessmentSync'
 
 export default function Assessment() {
   const TOTAL_QUESTIONS = 8
@@ -64,38 +65,35 @@ export default function Assessment() {
   }
 
   const handleSelect = (opt, responseTime) => {
-    setAnswers((prev) => {
-      const updated = [...prev, { selected: opt, responseTime }]
+    const updated = [...answers, { selected: opt, responseTime }]
+    setAnswers(updated)
 
-      if (questionIndex < TOTAL_QUESTIONS - 1) {
-        const wasCorrect =
-          opt !== null && String(opt) === String(current.correctAnswer)
-        const quick = responseTime < 5000
+    if (questionIndex < TOTAL_QUESTIONS - 1) {
+      const wasCorrect =
+        opt !== null && String(opt) === String(current.correctAnswer)
+      const quick = responseTime < 5000
 
-        const nextDifficulty = Math.min(
-          5,
-          Math.max(
-            1,
-            current.difficulty +
-              (wasCorrect && quick ? 1 : 0) -
-              (!wasCorrect ? 1 : 0)
-          )
+      const nextDifficulty = Math.min(
+        5,
+        Math.max(
+          1,
+          current.difficulty +
+            (wasCorrect && quick ? 1 : 0) -
+            (!wasCorrect ? 1 : 0)
         )
+      )
 
-        const nextQ = generateAdaptiveQuestion(
-          nextDifficulty,
-          questionIndex + 1
-        )
-        setQuestions((q) => [...q, nextQ])
-        setCurrent(nextQ)
-        setQuestionIndex((i) => i + 1)
-        startTsRef.current = Date.now()
-      } else {
-        submitAssessment(updated)
-      }
-
-      return updated
-    })
+      const nextQ = generateAdaptiveQuestion(
+        nextDifficulty,
+        questionIndex + 1
+      )
+      setQuestions((q) => [...q, nextQ])
+      setCurrent(nextQ)
+      setQuestionIndex((i) => i + 1)
+      startTsRef.current = Date.now()
+    } else {
+      submitAssessment(updated)
+    }
   }
 
   /* ================= SUBMIT ================= */
@@ -104,38 +102,18 @@ export default function Assessment() {
     setSubmitting(true)
 
     try {
-      questions.forEach((q, i) => {
-        if (!q.questionType) {
-          throw new Error(`Question ${i} missing questionType`)
-        }
+      const legacyId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36);
+      
+      const synced = await syncAssessmentToPhase2({
+        assessmentType: 'FULL',
+        legacyAssessmentId: legacyId,
+        questions,
+        answers: finalAnswers,
       })
 
-      const questionsPayload = questions.map((q) => ({
-        questionType: q.questionType,
-        questionText: q.questionText,
-        options: q.options,
-        correctAnswer: q.correctAnswer,
-        difficulty: q.difficulty,
-      }))
-
-      const startRes = await client.post('/api/assessments/start', {
-        userId: getUser()?._id,
-        questions: questionsPayload,
-      })
-
-      const assessmentId = startRes.data._id
-
-      const mappedAnswers = finalAnswers.map((a, idx) => ({
-        questionId: startRes.data.questions[idx]?._id,
-        selectedAnswer: a.selected,
-        responseTime: a.responseTime,
-        attempts: 1,
-      }))
-
-      await client.post('/api/assessments/submit', {
-        assessmentId,
-        answers: mappedAnswers,
-      })
+      if (!synced) {
+        throw new Error('Assessment submission failed. Is the Spring Boot backend running?')
+      }
 
       navigate('/results', { replace: true })
     } catch (err) {

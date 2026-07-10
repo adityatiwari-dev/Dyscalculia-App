@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react'
-import client from '../api/client'
+import client from '../api/springClient'
 import { getUser } from '../auth'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorBanner from '../components/ErrorBanner'
 import { useNavigate } from 'react-router-dom'
+import { syncAssessmentToPhase2 } from '../utils/assessmentSync'
 
 export default function Screening(){
   const navigate = useNavigate()
@@ -128,22 +129,23 @@ export default function Screening(){
     setSubmitting(true)
     setError('')
     try{
-      const questionsPayload = questions.map(q => ({
-        questionType: q.questionType,
-        questionText: q.questionText,
-        options: (q.options||[]).map(o => ({ text: String(o.text||o), image: o.image||'', isCorrect: !!o.isCorrect })),
-        correctAnswer: q.correctAnswer,
-        difficulty: q.difficulty,
-        subtype: q.subtype ?? subtype ?? null,
-        images: q.images ?? []
-      }))
-      const startRes = await client.post('/api/assessments/start', { userId: getUser()?._id, questions: questionsPayload })
-      const assessment = startRes.data
-      const mappedAnswers = answers.map((a, idx) => ({ questionId: assessment.questions[idx]?._id || null, selectedAnswer: a.selected, responseTime: a.responseTime || 0 }))
-      await client.post('/api/assessments/submit', { assessmentId: assessment._id, answers: mappedAnswers })
+      const legacyId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36);
+      
+      const synced = await syncAssessmentToPhase2({
+        assessmentType: 'SCREENING',
+        legacyAssessmentId: legacyId,
+        questions,
+        answers,
+        subtype,
+      })
+
+      if (!synced) {
+        throw new Error('Assessment submission failed. Is the Spring Boot backend running?')
+      }
+
       navigate('/results')
     }catch(err){
-      setError(err.response?.data?.message || 'Failed to submit subtest')
+      setError(err.message || 'Failed to submit subtest')
     }finally{
       setSubmitting(false)
     }

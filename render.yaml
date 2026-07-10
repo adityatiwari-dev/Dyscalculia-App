@@ -1,0 +1,37 @@
+services:
+  # MySQL Private Service (Database)
+  - type: privateService
+    name: numberbuddies-db
+    runtime: image
+    image: mysql:8.0
+    disk:
+      name: mysql-data
+      mountPath: /var/lib/mysql
+      sizeGB: 1
+    envVars:
+      - key: MYSQL_ROOT_PASSWORD
+        value: Adi@1709
+      - key: MYSQL_DATABASE
+        value: number_buddies
+
+  # Spring Boot Backend Web Service
+  - type: web
+    name: numberbuddies-backend
+    runtime: docker
+    dockerfilePath: Dockerfile
+    rootDirectory: phase2-backend
+    envVars:
+      - key: SPRING_DATASOURCE_URL
+        value: jdbc:mysql://numberbuddies-db:3306/number_buddies
+      - key: SPRING_DATASOURCE_USERNAME
+        value: root
+      - key: SPRING_DATASOURCE_PASSWORD
+        value: Adi@1709
+      - key: SPRING_JPA_HIBERNATE_DDL_AUTO
+        value: validate
+      - key: CORS_ORIGINS
+        value: https://frontend-phi-five-61.vercel.app
+      - key: JWT_SECRET
+        value: dGhpcy1pcy1hLXNlY3VyZS1zZWNyZXQta2V5LWYyLWRpc2NhbGN1bGlhLWFwcC1iYWNrZW5k
+      - key: AI_ENABLED
+        value: false

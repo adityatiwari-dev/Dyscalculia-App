@@ -1,0 +1,41 @@
+spring:
+  application:
+    name: number-buddies-phase2
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:${DATABASE_URL:${MYSQL_URL:jdbc:mysql://localhost:3306/number_buddies}}}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${SPRING_DATASOURCE_USERNAME:${DATABASE_USERNAME:${MYSQLUSER:root}}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${DATABASE_PASSWORD:${MYSQLPASSWORD:${MYSQL_PASSWORD:Adi@1709}}}}
+
+  jpa:
+    hibernate:
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+
+  flyway:
+    enabled: true
+server:
+  port: ${PORT:8080}
+
+app:
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:3000}
+  ai:
+    enabled: ${AI_ENABLED:false}
+    api-url: ${AI_API_URL:https://api.openai.com/v1/chat/completions}
+    api-key: ${AI_API_KEY:}
+    model: ${AI_MODEL:gpt-4o-mini}
+    timeout-seconds: ${AI_TIMEOUT_SECONDS:30}
+  disclaimer: "This is an educational screening tool, not a medical diagnosis of dyscalculia."
+  jwt:
+    secret: ${JWT_SECRET:dGhpcy1pcy1hLXNlY3VyZS1zZWNyZXQta2V5LWYyLWRpc2NhbGN1bGlhLWFwcC1iYWNrZW5k}
+    expiration-ms: ${JWT_EXPIRATION_MS:2592000000}
+
+logging:
+  level:
+    com.numberbuddies.phase2: INFO

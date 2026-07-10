@@ -1,0 +1,190 @@
+package com.numberbuddies.phase2.domain.entity;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+@Entity
+@Table(name = "user_profiles")
+public class UserProfile {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
+    @Column(name = "external_user_id", nullable = false, unique = true, length = 64)
+    private String externalUserId;
+
+    @Column(length = 255)
+    private String email;
+
+    @Column(length = 255)
+    private String name;
+
+    private Integer age;
+
+    @Column(length = 50)
+    private String grade;
+
+    @Column(nullable = false, length = 30)
+    private String role = "student";
+
+    @Column(name = "created_at", nullable = false)
+    private OffsetDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private OffsetDateTime updatedAt;
+
+    @Column(length = 255)
+    private String password;
+
+    @Column(length = 100)
+    private String language;
+
+    @Column(name = "educational_board", length = 100)
+    private String educationalBoard;
+
+    private Boolean consent;
+
+    @Column(name = "consent_date")
+    private OffsetDateTime consentDate;
+
+    @PrePersist
+    void onCreate() {
+        OffsetDateTime now = OffsetDateTime.now();
+        createdAt = now;
+        updatedAt = now;
+    }
+
+    @PreUpdate
+    void onUpdate() {
+        updatedAt = OffsetDateTime.now();
+    }
+
+    public UUID getId() {
+        return id;
+    }
+
+    public void setId(UUID id) {
+        this.id = id;
+    }
+
+    public String getExternalUserId() {
+        return externalUserId;
+    }
+
+    public void setExternalUserId(String externalUserId) {
+        this.externalUserId = externalUserId;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public Integer getAge() {
+        return age;
+    }
+
+    public void setAge(Integer age) {
+        this.age = age;
+    }
+
+    public String getGrade() {
+        return grade;
+    }
+
+    public void setGrade(String grade) {
+        this.grade = grade;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
+    }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public OffsetDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_id")
+    private UserProfile parent;
+
+    public UserProfile getParent() {
+        return parent;
+    }
+
+    public void setParent(UserProfile parent) {
+        this.parent = parent;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    public String getLanguage() {
+        return language;
+    }
+
+    public void setLanguage(String language) {
+        this.language = language;
+    }
+
+    public String getEducationalBoard() {
+        return educationalBoard;
+    }
+
+    public void setEducationalBoard(String educationalBoard) {
+        this.educationalBoard = educationalBoard;
+    }
+
+    public Boolean getConsent() {
+        return consent;
+    }
+
+    public void setConsent(Boolean consent) {
+        this.consent = consent;
+    }
+
+    public OffsetDateTime getConsentDate() {
+        return consentDate;
+    }
+
+    public void setConsentDate(OffsetDateTime consentDate) {
+        this.consentDate = consentDate;
+    }
+}

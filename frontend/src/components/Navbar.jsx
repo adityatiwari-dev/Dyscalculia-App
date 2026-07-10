@@ -42,10 +42,18 @@ export default function Navbar() {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex gap-4">
-          <Link to="/assessment" className="hover:text-primary">Assessment</Link>
-          <Link to="/screening" className="hover:text-primary">Screening</Link>
-          <Link to="/activities" className="hover:text-primary">Activities</Link>
-          <Link to="/results" className="hover:text-primary">Results</Link>
+          {user?.role === 'parent' ? (
+            <Link to="/parent-dashboard" className="hover:text-primary font-bold">Parent Dashboard</Link>
+          ) : (
+            <>
+              <Link to="/assessment" className="hover:text-primary">Assessment</Link>
+              <Link to="/screening" className="hover:text-primary">Screening</Link>
+              <Link to="/activities" className="hover:text-primary">Activities</Link>
+              <Link to="/results" className="hover:text-primary">Results</Link>
+              <Link to="/history" className="hover:text-primary">History</Link>
+              <Link to="/progress" className="hover:text-primary">Progress</Link>
+            </>
+          )}
         </nav>
 
         {/* Desktop Auth */}
@@ -114,49 +122,85 @@ export default function Navbar() {
               {/* Drawer Navigation */}
           
 <nav className="flex-1 space-y-3">
-  <Link
-    onClick={() => setOpen(false)}
-    to="/assessment"
-    className="flex items-center gap-3 px-4 py-4 rounded-xl
-               bg-gray-100 hover:bg-gray-200 transition
-               text-gray-900 hover:text-black"
-  >
-    <span className="text-xl">🧠</span>
-    <span className="font-medium">Assessment</span>
-  </Link>
+  {user?.role === 'parent' ? (
+    <Link
+      onClick={() => setOpen(false)}
+      to="/parent-dashboard"
+      className="flex items-center gap-3 px-4 py-4 rounded-xl
+                 bg-primary/10 border-2 border-primary text-black transition"
+    >
+      <span className="text-xl">📈</span>
+      <span className="font-bold">Parent Dashboard</span>
+    </Link>
+  ) : (
+    <>
+      <Link
+        onClick={() => setOpen(false)}
+        to="/assessment"
+        className="flex items-center gap-3 px-4 py-4 rounded-xl
+                   bg-gray-100 hover:bg-gray-200 transition
+                   text-gray-900 hover:text-black"
+      >
+        <span className="text-xl">🧠</span>
+        <span className="font-medium">Assessment</span>
+      </Link>
 
-  <Link
-    onClick={() => setOpen(false)}
-    to="/screening"
-    className="flex items-center gap-3 px-4 py-4 rounded-xl
-               bg-gray-100 hover:bg-gray-200 transition
-               text-gray-900 hover:text-black"
-  >
-    <span className="text-xl">📝</span>
-    <span className="font-medium">Screening</span>
-  </Link>
+      <Link
+        onClick={() => setOpen(false)}
+        to="/screening"
+        className="flex items-center gap-3 px-4 py-4 rounded-xl
+                   bg-gray-100 hover:bg-gray-200 transition
+                   text-gray-900 hover:text-black"
+      >
+        <span className="text-xl">📝</span>
+        <span className="font-medium">Screening</span>
+      </Link>
 
-  <Link
-    onClick={() => setOpen(false)}
-    to="/activities"
-    className="flex items-center gap-3 px-4 py-4 rounded-xl
-               bg-gray-100 hover:bg-gray-200 transition
-               text-gray-900 hover:text-black"
-  >
-    <span className="text-xl">🎯</span>
-    <span className="font-medium">Activities</span>
-  </Link>
+      <Link
+        onClick={() => setOpen(false)}
+        to="/activities"
+        className="flex items-center gap-3 px-4 py-4 rounded-xl
+                   bg-gray-100 hover:bg-gray-200 transition
+                   text-gray-900 hover:text-black"
+      >
+        <span className="text-xl">🎯</span>
+        <span className="font-medium">Activities</span>
+      </Link>
 
-  <Link
-    onClick={() => setOpen(false)}
-    to="/results"
-    className="flex items-center gap-3 px-4 py-4 rounded-xl
-               bg-gray-100 hover:bg-gray-200 transition
-               text-gray-900 hover:text-black"
-  >
-    <span className="text-xl">📊</span>
-    <span className="font-medium">Results</span>
-  </Link>
+      <Link
+        onClick={() => setOpen(false)}
+        to="/results"
+        className="flex items-center gap-3 px-4 py-4 rounded-xl
+                   bg-gray-100 hover:bg-gray-200 transition
+                   text-gray-900 hover:text-black"
+      >
+        <span className="text-xl">📊</span>
+        <span className="font-medium">Results</span>
+      </Link>
+
+      <Link
+        onClick={() => setOpen(false)}
+        to="/history"
+        className="flex items-center gap-3 px-4 py-4 rounded-xl
+                   bg-gray-100 hover:bg-gray-200 transition
+                   text-gray-900 hover:text-black"
+      >
+        <span className="text-xl">📅</span>
+        <span className="font-medium">History</span>
+      </Link>
+
+      <Link
+        onClick={() => setOpen(false)}
+        to="/progress"
+        className="flex items-center gap-3 px-4 py-4 rounded-xl
+                   bg-gray-100 hover:bg-gray-200 transition
+                   text-gray-900 hover:text-black"
+      >
+        <span className="text-xl">📈</span>
+        <span className="font-medium">Progress</span>
+      </Link>
+    </>
+  )}
 </nav>
 
 

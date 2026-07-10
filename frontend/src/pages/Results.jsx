@@ -1,5 +1,5 @@
 import React from 'react'
-import client from '../api/client'
+import client from '../api/springClient'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorBanner from '../components/ErrorBanner'
 import { detectErrorPatterns } from '../utils/errorAnalysis'
@@ -12,7 +12,7 @@ export default function Results() {
   React.useEffect(() => {
     (async () => {
       try {
-        const res = await client.get('/api/assessments/results')
+        const res = await client.get('/api/v2/assessments/results')
         setResults(res.data)
       } catch (err) {
         console.error(err)
@@ -24,7 +24,7 @@ export default function Results() {
  const downloadCSV = async () => {
   setCsvLoading(true)
   try {
-    const res = await client.get('/api/assessments/export', { responseType: 'blob' })
+    const res = await client.get('/api/v2/assessments/export', { responseType: 'blob' })
     const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8' })
     let filename = 'assessment_results.csv'
     const cd = res.headers?.['content-disposition'] || res.headers?.['Content-Disposition']
@@ -119,6 +119,43 @@ export default function Results() {
             <div className="text-3xl font-bold text-black">{Math.round(latest.scores.total || 0)}%</div>
             <div className="text-sm text-black">Risk: <strong>{latest.dyscalculiaRiskIndex}</strong> · Confidence: {Math.round(latest.confidenceScore || 0)}%</div>
 
+            <div className="flex gap-2 mt-3">
+              <a
+                href={`/ai-report/${latest._id}`}
+                className="px-3 py-1.5 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary/95 transition text-center flex-1"
+              >
+                View AI Report
+              </a>
+              <button
+                onClick={async () => {
+                  try {
+                    const user = JSON.parse(localStorage.getItem('user') || '{}')
+                    const externalUserId = user.id || user._id
+                    if (!externalUserId) return
+                    const res = await client.get(`/api/v2/ai/reports/${latest._id}/pdf`, {
+                      params: { externalUserId },
+                      responseType: 'blob'
+                    })
+                    const blob = new Blob([res.data], { type: 'application/pdf' })
+                    const url = window.URL.createObjectURL(blob)
+                    const link = document.createElement('a')
+                    link.href = url
+                    link.setAttribute('download', `screening_report_${latest._id}.pdf`)
+                    document.body.appendChild(link)
+                    link.click()
+                    link.remove()
+                    window.URL.revokeObjectURL(url)
+                  } catch (err) {
+                    console.error("PDF download failed:", err)
+                    alert("Unable to download PDF. Please try viewing the AI report first.")
+                  }
+                }}
+                className="px-3 py-1.5 border border-gray-300 text-black text-xs font-bold rounded-lg hover:bg-gray-50 transition text-center flex-1"
+              >
+                Download PDF Report
+              </button>
+            </div>
+
             <div className="mt-3">
               <h4 className="font-semibold mb-2 text-black">Domain breakdown</h4>
               <div className="w-full h-36">
@@ -178,6 +215,11 @@ export default function Results() {
                   <div>
                     <div className="font-semibold text-black">Score: {Math.round(r.scores.total || 0)}%</div>
                     <div className="text-sm text-black">Risk: {r.dyscalculiaRiskIndex} · Confidence: {Math.round(r.confidenceScore || 0)}%</div>
+                    <div className="mt-1 flex gap-3 text-xs">
+                      <a href={`/ai-report/${r._id}`} className="text-primary font-semibold hover:underline">
+                        View AI Report
+                      </a>
+                    </div>
                   </div>
                   <div className="text-sm text-black">{new Date(r.createdAt).toLocaleString()}</div>
                 </div>
