@@ -39,13 +39,14 @@ public class SecurityConfig {
             .cors(Customizer.withDefaults())
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/api/v2/assessments/sync").permitAll()
-                .requestMatchers("/api/v2/users/sync").permitAll()
-                .requestMatchers("/error").permitAll()
-                .anyRequest().authenticated()
-            );
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/v2/health").permitAll()
+                        .requestMatchers("/api/v2/assessments/sync").permitAll()
+                        .requestMatchers("/api/v2/users/sync").permitAll()
+                        .requestMatchers("/error").permitAll()
+                        .anyRequest().authenticated()
+                )
 
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
