@@ -46,7 +46,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v2/users/sync").permitAll()
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated()
-                )
+                );
 
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
