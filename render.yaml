@@ -1,37 +1,38 @@
 services:
-  # MySQL Private Service (Database)
-  - type: privateService
-    name: numberbuddies-db
-    runtime: image
-    image: mysql:8.0
-    disk:
-      name: mysql-data
-      mountPath: /var/lib/mysql
-      sizeGB: 1
-    envVars:
-      - key: MYSQL_ROOT_PASSWORD
-        value: Adi@1709
-      - key: MYSQL_DATABASE
-        value: number_buddies
-
   # Spring Boot Backend Web Service
   - type: web
     name: numberbuddies-backend
+    plan: free
     runtime: docker
-    dockerfilePath: Dockerfile
     rootDirectory: phase2-backend
+    dockerfilePath: Dockerfile
+    healthCheckPath: /api/v2/health
+
     envVars:
+      # Database Connection (To be configured manually in Render Dashboard using a free managed database like Aiven)
       - key: SPRING_DATASOURCE_URL
-        value: jdbc:mysql://numberbuddies-db:3306/number_buddies
+        sync: false
       - key: SPRING_DATASOURCE_USERNAME
-        value: root
+        sync: false
       - key: SPRING_DATASOURCE_PASSWORD
-        value: Adi@1709
+        sync: false
+
+      # JPA / Schema Configuration
       - key: SPRING_JPA_HIBERNATE_DDL_AUTO
         value: validate
-      - key: CORS_ORIGINS
-        value: https://frontend-phi-five-61.vercel.app
+
+      # JWT Configuration
       - key: JWT_SECRET
         value: dGhpcy1pcy1hLXNlY3VyZS1zZWNyZXQta2V5LWYyLWRpc2NhbGN1bGlhLWFwcC1iYWNrZW5k
+
+      # CORS Origin (Points to Vercel production frontend)
+      - key: CORS_ORIGINS
+        value: https://frontend-phi-five-61.vercel.app
+
+      # AI Module Toggle
       - key: AI_ENABLED
-        value: false
+        value: "false"
+
+      # JVM Memory Optimization for Render Free Tier (512MB RAM constraint)
+      - key: JAVA_TOOL_OPTIONS
+        value: -XX:MaxRAMPercentage=75.0 -XX:ActiveProcessorCount=1 -Xss256k -XX:+UseSerialGC
