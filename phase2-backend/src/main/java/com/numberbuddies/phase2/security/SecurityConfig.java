@@ -45,6 +45,12 @@ public class SecurityConfig {
                         .requestMatchers("/api/v2/assessments/sync").permitAll()
                         .requestMatchers("/api/v2/users/sync").permitAll()
                         .requestMatchers("/error").permitAll()
+                        .requestMatchers("/api/v2/teacher/**").hasRole("TEACHER")
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v2/questions/adaptive").authenticated()
+                        .requestMatchers("/api/v2/questions/**").hasRole("ADMIN")
+                        .requestMatchers("/api/v2/admin/**").hasRole("ADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v2/feedback").permitAll()
+                        .requestMatchers("/api/v2/feedback/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 );
 

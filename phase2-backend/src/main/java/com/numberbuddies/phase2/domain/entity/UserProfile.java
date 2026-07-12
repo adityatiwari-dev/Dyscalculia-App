@@ -148,6 +148,18 @@ public class UserProfile {
         this.parent = parent;
     }
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "teacher_id")
+    private UserProfile teacher;
+
+    public UserProfile getTeacher() {
+        return teacher;
+    }
+
+    public void setTeacher(UserProfile teacher) {
+        this.teacher = teacher;
+    }
+
     public String getPassword() {
         return password;
     }

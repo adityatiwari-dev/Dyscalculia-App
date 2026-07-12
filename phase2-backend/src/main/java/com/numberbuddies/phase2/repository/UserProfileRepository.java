@@ -13,5 +13,7 @@ public interface UserProfileRepository extends JpaRepository<UserProfile, UUID> 
 
     List<UserProfile> findByParent_ExternalUserId(String parentExternalUserId);
 
+    List<UserProfile> findByTeacher_ExternalUserId(String teacherExternalUserId);
+
     Optional<UserProfile> findByEmail(String email);
 }

@@ -157,4 +157,100 @@ public class UserService {
 
         return summaries;
     }
+
+    @Transactional
+    public void linkStudentToTeacher(String teacherExternalUserId, String studentExternalUserId) {
+        UserProfile teacher = userProfileRepository.findByExternalUserId(teacherExternalUserId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Teacher profile not found"));
+
+        if (!"teacher".equalsIgnoreCase(teacher.getRole())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Specified user is not a teacher");
+        }
+
+        UserProfile student = userProfileRepository.findByExternalUserId(studentExternalUserId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Student profile not found"));
+
+        if ("teacher".equalsIgnoreCase(student.getRole()) || "parent".equalsIgnoreCase(student.getRole())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Cannot assign a teacher or parent profile as a student");
+        }
+
+        student.setTeacher(teacher);
+        userProfileRepository.save(student);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ChildSummaryResponse> getTeacherStudents(String teacherExternalUserId) {
+        UserProfile teacher = userProfileRepository.findByExternalUserId(teacherExternalUserId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Teacher profile not found"));
+
+        List<UserProfile> students = userProfileRepository.findByTeacher_ExternalUserId(teacherExternalUserId);
+        List<ChildSummaryResponse> summaries = new ArrayList<>();
+
+        for (UserProfile child : students) {
+            ChildSummaryResponse summary = new ChildSummaryResponse();
+            summary.setExternalUserId(child.getExternalUserId());
+            summary.setName(child.getName());
+            summary.setGrade(child.getGrade());
+            summary.setAge(child.getAge());
+
+            List<AssessmentRecord> assessments = assessmentRecordRepository.findByUser_IdOrderByCompletedAtDesc(child.getId());
+            List<QuestionResult> questionResults = questionResultRepository.findByAssessment_User_Id(child.getId());
+            List<AiReport> reports = aiReportRepository.findByUser_IdOrderByCreatedAtDesc(child.getId());
+
+            if (assessments.isEmpty()) {
+                summary.setOverallAccuracy(BigDecimal.ZERO);
+                summary.setLatestAssessmentDate(null);
+            } else {
+                BigDecimal totalAcc = BigDecimal.ZERO;
+                for (AssessmentRecord record : assessments) {
+                    totalAcc = totalAcc.add(record.getAccuracy() != null ? record.getAccuracy() : BigDecimal.ZERO);
+                }
+                summary.setOverallAccuracy(totalAcc.divide(BigDecimal.valueOf(assessments.size()), 2, RoundingMode.HALF_UP));
+                summary.setLatestAssessmentDate(assessments.get(0).getCompletedAt());
+            }
+
+            if (reports.isEmpty()) {
+                summary.setAiRiskLevel("UNKNOWN");
+            } else {
+                summary.setAiRiskLevel(reports.get(0).getRiskLevel() != null ? reports.get(0).getRiskLevel().name() : "UNKNOWN");
+            }
+
+            // Strongest/Weakest Topic calculation
+            if (questionResults.isEmpty()) {
+                summary.setStrongestTopic("—");
+                summary.setWeakestTopic("—");
+            } else {
+                Map<WeakTopic, List<QuestionResult>> grouped = questionResults.stream()
+                        .filter(q -> q.getTopic() != null)
+                        .collect(Collectors.groupingBy(QuestionResult::getTopic));
+
+                String strongest = "—";
+                String weakest = "—";
+                double maxAcc = -1.0;
+                double minAcc = 101.0;
+
+                for (Map.Entry<WeakTopic, List<QuestionResult>> entry : grouped.entrySet()) {
+                    List<QuestionResult> list = entry.getValue();
+                    long count = list.size();
+                    long correct = list.stream().filter(QuestionResult::isCorrect).count();
+                    double acc = count == 0 ? 0.0 : (correct * 100.0 / count);
+
+                    if (acc > maxAcc) {
+                        maxAcc = acc;
+                        strongest = entry.getKey().name();
+                    }
+                    if (acc < minAcc) {
+                        minAcc = acc;
+                        weakest = entry.getKey().name();
+                    }
+                }
+                summary.setStrongestTopic(strongest);
+                summary.setWeakestTopic(weakest);
+            }
+
+            summaries.add(summary);
+        }
+
+        return summaries;
+    }
 }

@@ -21,6 +21,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 @Entity
 @Table(name = "assessments")
 public class AssessmentRecord {
@@ -58,6 +60,7 @@ public class AssessmentRecord {
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
+    @JsonIgnore
     @OneToMany(mappedBy = "assessment")
     private List<QuestionResult> questionResults = new ArrayList<>();
 

@@ -262,14 +262,20 @@ public class AssessmentHistoryService {
             String qType = qr.getQuestionType() != null ? qr.getQuestionType().toLowerCase() : "";
             String topic = qr.getTopic() != null ? qr.getTopic().name().toLowerCase() : "";
 
-            if (topic.contains("comparison") || topic.contains("number_line") || topic.contains("subitizing") || qType.contains("sense") || qType.contains("line")) {
-                domain = "number_sense";
-            } else if (topic.contains("addition") || topic.contains("subtraction") || topic.contains("multiplication") || topic.contains("division") || qType.contains("addition") || qType.contains("subtraction")) {
+            if (topic.contains("addition") || topic.contains("subtraction") || topic.contains("multiplication") || topic.contains("division")
+                    || qType.contains("arithmetic") || qType.contains("addition") || qType.contains("subtraction")) {
                 domain = "arithmetic";
-            } else if (qType.contains("spatial") || qType.contains("geometry") || qType.contains("shape") || topic.contains("spatial")) {
+            } else if (topic.contains("comparison") || topic.contains("place_value") || topic.contains("number_sense")
+                    || qType.contains("sense") || qType.contains("dot") || qType.contains("comparison") || qType.contains("line") || qType.contains("place")) {
+                domain = "number_sense";
+            } else if (qType.contains("spatial") || qType.contains("geometry") || qType.contains("shape") || qType.contains("color") || topic.contains("spatial")) {
                 domain = "spatial";
-            } else if (qType.contains("memory") || qType.contains("sequence") || topic.contains("memory")) {
+            } else if (qType.contains("memory") || qType.contains("sequence") || qType.contains("pattern") || topic.contains("pattern") || topic.contains("memory")) {
                 domain = "memory";
+            }
+
+            if ("general".equals(domain)) {
+                domain = "number_sense"; // Default fallback
             }
 
             total.put(domain, total.getOrDefault(domain, 0) + 1);
@@ -286,8 +292,10 @@ public class AssessmentHistoryService {
         scores.put("memory", 0.0);
 
         for (String domain : total.keySet()) {
-            double accuracy = (correct.getOrDefault(domain, 0) * 100.0) / total.get(domain);
-            scores.put(domain, Math.round(accuracy * 100.0) / 100.0);
+            if (scores.containsKey(domain)) {
+                double accuracy = (correct.getOrDefault(domain, 0) * 100.0) / total.get(domain);
+                scores.put(domain, Math.round(accuracy * 100.0) / 100.0);
+            }
         }
         return scores;
     }
