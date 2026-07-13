@@ -43,7 +43,7 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/v2/health").permitAll()
-                        .requestMatchers("/api/v2/assessments/sync").permitAll()
+                        .requestMatchers("/api/v2/assessments/**").permitAll()
                         .requestMatchers("/api/v2/users/sync").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/api/v2/teacher/**").hasRole("TEACHER")

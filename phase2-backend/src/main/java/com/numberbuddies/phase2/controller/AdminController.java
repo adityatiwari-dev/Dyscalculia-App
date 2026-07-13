@@ -16,10 +16,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.numberbuddies.phase2.dto.response.AdminAssessmentResponse;
+import com.numberbuddies.phase2.dto.response.UserProfileResponse;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v2/admin")
@@ -45,12 +48,15 @@ public class AdminController {
     }
 
     @GetMapping("/users")
-    public ResponseEntity<List<UserProfile>> getAllUsers() {
-        return ResponseEntity.ok(userProfileRepository.findAll());
+    public ResponseEntity<List<UserProfileResponse>> getAllUsers() {
+        List<UserProfileResponse> users = userProfileRepository.findAll().stream()
+                .map(UserProfileResponse::fromEntity)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(users);
     }
 
     @PutMapping("/users/{id}")
-    public ResponseEntity<UserProfile> updateUser(
+    public ResponseEntity<UserProfileResponse> updateUser(
             @PathVariable UUID id,
             @Valid @RequestBody UserProfile userDetails
     ) {
@@ -63,7 +69,8 @@ public class AdminController {
         user.setGrade(userDetails.getGrade());
         user.setAge(userDetails.getAge());
 
-        return ResponseEntity.ok(userProfileRepository.save(user));
+        UserProfile updated = userProfileRepository.save(user);
+        return ResponseEntity.ok(UserProfileResponse.fromEntity(updated));
     }
 
     @DeleteMapping("/users/{id}")
@@ -75,8 +82,11 @@ public class AdminController {
     }
 
     @GetMapping("/assessments")
-    public ResponseEntity<List<AssessmentRecord>> getAllAssessments() {
-        return ResponseEntity.ok(assessmentRecordRepository.findAllWithUser());
+    public ResponseEntity<List<AdminAssessmentResponse>> getAllAssessments() {
+        List<AdminAssessmentResponse> list = assessmentRecordRepository.findAllWithUser().stream()
+                .map(AdminAssessmentResponse::fromEntity)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(list);
     }
 
     @DeleteMapping("/assessments/{id}")

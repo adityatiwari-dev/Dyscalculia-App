@@ -77,18 +77,25 @@ public class UserService {
         return userProfileRepository.save(user);
     }
 
+    private boolean isRoleMatch(String actualRole, String expectedRole) {
+        if (actualRole == null) return false;
+        String clean = actualRole.trim().toLowerCase();
+        String expectedClean = expectedRole.trim().toLowerCase();
+        return clean.equals(expectedClean) || clean.equals("role_" + expectedClean);
+    }
+
     @Transactional
     public void linkChild(LinkChildRequest request) {
         UserProfile parent = userProfileRepository.findByExternalUserId(request.getParentExternalUserId())
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Parent profile not found"));
 
-        if (!"parent".equalsIgnoreCase(parent.getRole())) {
+        if (!isRoleMatch(parent.getRole(), "parent")) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Specified user is not a parent");
         }
 
         UserProfile child = findStudentProfile(request.getChildExternalUserId(), request.getStudentCode());
 
-        if (!"student".equalsIgnoreCase(child.getRole())) {
+        if (!isRoleMatch(child.getRole(), "student")) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Specified child is not a student account");
         }
 
@@ -129,13 +136,13 @@ public class UserService {
         UserProfile teacher = userProfileRepository.findByExternalUserId(teacherExternalUserId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Teacher profile not found"));
 
-        if (!"teacher".equalsIgnoreCase(teacher.getRole())) {
+        if (!isRoleMatch(teacher.getRole(), "teacher")) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Specified user is not a teacher");
         }
 
         UserProfile student = findStudentProfile(studentExternalUserId, studentCode);
 
-        if (!"student".equalsIgnoreCase(student.getRole())) {
+        if (!isRoleMatch(student.getRole(), "student")) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Cannot link a non-student account");
         }
 

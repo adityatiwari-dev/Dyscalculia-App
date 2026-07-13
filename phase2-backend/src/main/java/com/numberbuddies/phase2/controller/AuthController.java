@@ -55,7 +55,11 @@ public class AuthController {
         if (Boolean.TRUE.equals(request.getConsent())) {
             user.setConsentDate(OffsetDateTime.now());
         }
-        user.setRole(request.getRole() != null && !request.getRole().isBlank() ? request.getRole() : "student");
+        String requestedRole = request.getRole() != null && !request.getRole().isBlank() ? request.getRole().trim().toLowerCase() : "student";
+        if ("admin".equals(requestedRole) || "role_admin".equals(requestedRole)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Admin accounts cannot be created via public registration");
+        }
+        user.setRole(requestedRole);
 
         // Set externalUserId dynamically to support unified database schema compatibility
         UUID newId = UUID.randomUUID();

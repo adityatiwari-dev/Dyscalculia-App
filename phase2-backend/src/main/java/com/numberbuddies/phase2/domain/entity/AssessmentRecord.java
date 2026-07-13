@@ -22,9 +22,11 @@ import java.util.List;
 import java.util.UUID;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Entity
 @Table(name = "assessments")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class AssessmentRecord {
 
     @Id

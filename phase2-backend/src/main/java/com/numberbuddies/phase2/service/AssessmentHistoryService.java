@@ -133,10 +133,15 @@ public class AssessmentHistoryService {
     }
 
     private AssessmentType parseAssessmentType(String value) {
+        if (value == null) return AssessmentType.SCREENING;
+        String upper = value.toUpperCase();
+        if (upper.contains("ADAPTIVE") || upper.contains("SCREEN")) return AssessmentType.SCREENING;
+        if (upper.contains("FULL")) return AssessmentType.FULL;
+        if (upper.contains("PRACTICE")) return AssessmentType.PRACTICE;
         try {
-            return AssessmentType.valueOf(value.toUpperCase());
+            return AssessmentType.valueOf(upper);
         } catch (IllegalArgumentException ex) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid assessmentType: " + value);
+            return AssessmentType.SCREENING;
         }
     }
 
@@ -195,9 +200,22 @@ public class AssessmentHistoryService {
     }
 
     @Transactional(readOnly = true)
-    public List<java.util.Map<String, Object>> getDetailedResults(String email) {
-        UserProfile user = userProfileRepository.findByEmail(email)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User profile not found"));
+    public List<java.util.Map<String, Object>> getDetailedResults(String authName, String emailParam, String externalUserIdParam) {
+        UserProfile user = null;
+        if (externalUserIdParam != null && !externalUserIdParam.isBlank()) {
+            user = userProfileRepository.findByExternalUserId(externalUserIdParam).orElse(null);
+        }
+        if (user == null && emailParam != null && !emailParam.isBlank()) {
+            user = userProfileRepository.findByEmail(emailParam.toLowerCase()).orElse(null);
+        }
+        if (user == null && authName != null && !authName.isBlank()) {
+            user = userProfileRepository.findByEmail(authName.toLowerCase())
+                    .or(() -> userProfileRepository.findByExternalUserId(authName))
+                    .orElse(null);
+        }
+        if (user == null) {
+            return java.util.Collections.emptyList();
+        }
 
         List<AssessmentRecord> records = assessmentRecordRepository.findByUser_IdOrderByCompletedAtDesc(user.getId());
 

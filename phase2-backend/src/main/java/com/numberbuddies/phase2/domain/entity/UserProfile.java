@@ -12,11 +12,15 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
 @Table(name = "user_profiles")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "teacher", "parent"})
 public class UserProfile {
 
     @Id
@@ -153,10 +157,12 @@ public class UserProfile {
         return updatedAt;
     }
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_id")
     private UserProfile parent;
 
+    @JsonIgnore
     public UserProfile getParent() {
         return parent;
     }
@@ -165,10 +171,12 @@ public class UserProfile {
         this.parent = parent;
     }
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "teacher_id")
     private UserProfile teacher;
 
+    @JsonIgnore
     public UserProfile getTeacher() {
         return teacher;
     }

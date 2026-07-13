@@ -31,7 +31,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return "OPTIONS".equalsIgnoreCase(request.getMethod())
                 || path.startsWith("/api/auth/")
                 || path.startsWith("/api/v2/health")
-                || path.startsWith("/api/v2/assessments/sync");
+                || path.startsWith("/api/v2/assessments/");
     }
 
     @Override

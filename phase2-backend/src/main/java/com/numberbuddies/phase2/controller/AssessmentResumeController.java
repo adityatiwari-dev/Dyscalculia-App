@@ -34,10 +34,23 @@ public class AssessmentResumeController {
         this.userProfileRepository = userProfileRepository;
     }
 
+    private UserProfile resolveUser(String externalUserId) {
+        return userProfileRepository.findByExternalUserId(externalUserId)
+                .or(() -> userProfileRepository.findByEmail(externalUserId.toLowerCase()))
+                .orElseGet(() -> {
+                    UserProfile created = new UserProfile();
+                    created.setId(UUID.randomUUID());
+                    created.setExternalUserId(externalUserId);
+                    created.setEmail(externalUserId.contains("@") ? externalUserId.toLowerCase() : externalUserId + "@guest.numberbuddies.com");
+                    created.setRole("student");
+                    created.setName("Student");
+                    return userProfileRepository.save(created);
+                });
+    }
+
     @GetMapping
     public ResponseEntity<AssessmentProgress> getProgress(@RequestParam String externalUserId) {
-        UserProfile user = userProfileRepository.findByExternalUserId(externalUserId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User profile not found"));
+        UserProfile user = resolveUser(externalUserId);
 
         return progressRepository.findById(user.getId())
                 .map(ResponseEntity::ok)
@@ -49,8 +62,7 @@ public class AssessmentResumeController {
             @RequestParam String externalUserId,
             @Valid @RequestBody AssessmentProgress progressRequest
     ) {
-        UserProfile user = userProfileRepository.findByExternalUserId(externalUserId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User profile not found"));
+        UserProfile user = resolveUser(externalUserId);
 
         AssessmentProgress progress = progressRepository.findById(user.getId())
                 .orElseGet(() -> {
@@ -72,8 +84,7 @@ public class AssessmentResumeController {
 
     @DeleteMapping
     public ResponseEntity<Void> clearProgress(@RequestParam String externalUserId) {
-        UserProfile user = userProfileRepository.findByExternalUserId(externalUserId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User profile not found"));
+        UserProfile user = resolveUser(externalUserId);
 
         progressRepository.findById(user.getId()).ifPresent(progressRepository::delete);
         return ResponseEntity.noContent().build();

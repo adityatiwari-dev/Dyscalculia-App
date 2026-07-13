@@ -52,11 +52,15 @@ public class AssessmentController {
     }
 
     @GetMapping("/results")
-    public ResponseEntity<List<java.util.Map<String, Object>>> getDetailedResults() {
+    public ResponseEntity<List<java.util.Map<String, Object>>> getDetailedResults(
+            @RequestParam(required = false) String externalUserId,
+            @RequestParam(required = false) String email
+    ) {
         org.springframework.security.core.Authentication auth =
                 org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        String email = auth.getName();
-        return ResponseEntity.ok(assessmentHistoryService.getDetailedResults(email));
+        String authName = (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName()))
+                ? auth.getName() : null;
+        return ResponseEntity.ok(assessmentHistoryService.getDetailedResults(authName, email, externalUserId));
     }
 
     @GetMapping("/export")

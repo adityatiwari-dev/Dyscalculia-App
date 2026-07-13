@@ -4,6 +4,7 @@ import com.numberbuddies.phase2.domain.entity.UserProfile;
 import com.numberbuddies.phase2.dto.request.LinkChildRequest;
 import com.numberbuddies.phase2.dto.request.UserProfileSyncRequest;
 import com.numberbuddies.phase2.dto.response.ChildSummaryResponse;
+import com.numberbuddies.phase2.dto.response.UserProfileResponse;
 import com.numberbuddies.phase2.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -27,11 +28,11 @@ public class UserController {
     }
 
     @PostMapping("/sync")
-    public ResponseEntity<UserProfile> syncUser(
+    public ResponseEntity<UserProfileResponse> syncUser(
             @Valid @RequestBody UserProfileSyncRequest request
     ) {
         UserProfile profile = userService.syncUser(request);
-        return ResponseEntity.ok(profile);
+        return ResponseEntity.ok(UserProfileResponse.fromEntity(profile));
     }
 
     @PostMapping("/link-child")
