@@ -1,15 +1,31 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import client from '../api/springClient'
 import { getUser } from '../auth'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorBanner from '../components/ErrorBanner'
 import { useNavigate } from 'react-router-dom'
 import { syncAssessmentToPhase2 } from '../utils/assessmentSync'
+import { usePrefetchCache } from '../utils/usePrefetchCache'
+import { useAssessmentAutosave } from '../utils/useAssessmentAutosave'
+import { perfLogger } from '../utils/performanceMetrics'
+
+const TOTAL_QUESTIONS = 8
+const TIMER_SECONDS = 20
+
+// Memoized Option Button to prevent unnecessary re-renders during 1s timer countdowns
+const OptionButton = React.memo(function OptionButton({ optText, onSelect, disabled }) {
+  return (
+    <button
+      onClick={() => onSelect(optText)}
+      disabled={disabled}
+      className="py-3 px-4 rounded-xl border-2 border-gray-300 font-medium text-black hover:border-primary hover:bg-primary/10 transition"
+    >
+      {optText}
+    </button>
+  )
+})
 
 export default function Assessment() {
-  const TOTAL_QUESTIONS = 8
-  const TIMER_SECONDS = 20
-
   const [questionIndex, setQuestionIndex] = useState(0)
   const [answers, setAnswers] = useState([])
   const [questions, setQuestions] = useState([])
@@ -29,125 +45,135 @@ export default function Assessment() {
   const navigate = useNavigate()
   const user = getUser()
 
-  const loadNextQuestion = async (diff, idx) => {
-    try {
-      const shownIds = questions.filter(q => q.id).map(q => q.id).join(',')
-      const res = await client.get('/api/v2/questions/adaptive', {
-        params: {
-          difficultyLevel: diff,
-          excludeIds: shownIds
-        }
-      })
-      if (res.status === 204 || !res.data) {
-        console.info("All DB questions exhausted for this session. Using local generator fallback.")
-        return generateAdaptiveQuestion(diff, idx)
-      }
-      const dbQ = res.data
-      return {
-        id: dbQ.id,
-        localId: `q-${idx}`,
-        questionType: dbQ.questionType,
-        questionText: dbQ.questionText,
-        options: dbQ.options.map(opt => ({ text: opt })),
-        correctAnswer: dbQ.correctAnswer,
-        difficulty: diff
-      }
-    } catch (err) {
-      console.warn("Failed to fetch adaptive question from DB, falling back...", err)
-      return generateAdaptiveQuestion(diff, idx)
-    }
-  }
+  // High-performance hooks
+  const { popQuestionSync, prefetchAdjacent, registerExistingQuestions } = usePrefetchCache()
+  const { triggerAutosave, getLocalStorageBackup, clearSession } = useAssessmentAutosave(user)
 
-  /* ================= INIT ================= */
+  /* ================= INIT & SESSION RESUME ================= */
   useEffect(() => {
+    perfLogger.reset()
+
     const checkSavedSession = async () => {
+      // First check local backup for rapid offline resume resilience
+      const localBackup = getLocalStorageBackup()
+
       if (!user?._id) {
         setCheckingProgress(false)
+        if (localBackup && Array.isArray(localBackup.questions) && localBackup.questions.length > 0) {
+          setSavedProgress(localBackup)
+          setShowResumeModal(true)
+          return
+        }
         startFresh()
         return
       }
 
       try {
+        const fetchStart = performance.now()
         const res = await client.get('/api/v2/assessments/progress', {
           params: { externalUserId: user._id }
         })
+        perfLogger.logApiFetch('GET /api/v2/assessments/progress', performance.now() - fetchStart, true)
+
         if (res.status === 200 && res.data) {
           setSavedProgress(res.data)
           setShowResumeModal(true)
+        } else if (localBackup && Array.isArray(localBackup.questions) && localBackup.questions.length > 0) {
+          setSavedProgress(localBackup)
+          setShowResumeModal(true)
         } else {
-          await startFresh()
+          startFresh()
         }
       } catch (err) {
-        await startFresh()
+        perfLogger.logApiFetch('GET /api/v2/assessments/progress', 0, false)
+        if (localBackup && Array.isArray(localBackup.questions) && localBackup.questions.length > 0) {
+          setSavedProgress(localBackup)
+          setShowResumeModal(true)
+        } else {
+          startFresh()
+        }
       } finally {
         setCheckingProgress(false)
       }
     }
+
     checkSavedSession()
 
-    return () => clearInterval(timerRef.current)
+    return () => {
+      clearInterval(timerRef.current)
+    }
   }, [])
 
-  const startFresh = async () => {
-    try {
-      const first = await loadNextQuestion(2, 0)
-      setQuestions([first])
-      setCurrent(first)
-    } catch (err) {
-      const fallback = generateAdaptiveQuestion(2, 0)
-      setQuestions([fallback])
-      setCurrent(fallback)
-    }
+  const startFresh = useCallback(() => {
+    // Instant synchronous initial question from cache or fallback
+    const { question: firstQ } = popQuestionSync(2, 0)
+    setQuestions([firstQ])
+    setCurrent(firstQ)
+    setQuestionIndex(0)
+    setAnswers([])
     startTsRef.current = Date.now()
-  }
 
-  const saveSessionProgress = async (idx, currentQuestions, currentAnswers, secLeft) => {
-    if (!user?._id) return
-    try {
-      await client.post(`/api/v2/assessments/progress?externalUserId=${user._id}`, {
-        assessmentType: 'FULL',
-        questions: currentQuestions,
-        answers: currentAnswers,
-        currentQuestionIndex: idx,
-        secondsLeft: secLeft,
-        difficulty: currentQuestions[idx]?.difficulty || 2
-      })
-    } catch (err) {
-      console.warn("Failed to autosave progress:", err)
-    }
-  }
+    // Trigger background prefetch for upcoming difficulties
+    prefetchAdjacent(2)
+  }, [popQuestionSync, prefetchAdjacent])
 
-  const handleResume = () => {
+  const handleResume = useCallback(() => {
     if (!savedProgress) return
+
+    registerExistingQuestions(savedProgress.questions)
     setQuestions(savedProgress.questions)
-    setAnswers(savedProgress.answers)
-    setQuestionIndex(savedProgress.currentQuestionIndex)
-    
+    setAnswers(savedProgress.answers || [])
+    const resumeIdx = savedProgress.currentQuestionIndex || 0
+    setQuestionIndex(resumeIdx)
+
     if (savedProgress.secondsLeft !== undefined && savedProgress.secondsLeft !== null) {
       restoredSecondsLeftRef.current = savedProgress.secondsLeft
     }
-    
-    setCurrent(savedProgress.questions[savedProgress.currentQuestionIndex])
+
+    const resumedQ = savedProgress.questions[resumeIdx] || savedProgress.questions[0]
+    setCurrent(resumedQ)
     setShowResumeModal(false)
     startTsRef.current = Date.now()
-  }
 
-  const handleDiscard = async () => {
-    try {
-      await client.delete(`/api/v2/assessments/progress?externalUserId=${user._id}`)
-    } catch (err) {
-      console.warn("Failed to discard saved session:", err)
-    }
+    // Replenish prefetch cache around resumed difficulty
+    prefetchAdjacent(resumedQ?.difficulty || 2)
+  }, [savedProgress, registerExistingQuestions, prefetchAdjacent])
+
+  const handleDiscard = useCallback(async () => {
+    await clearSession()
     setShowResumeModal(false)
-    await startFresh()
-  }
+    startFresh()
+  }, [clearSession, startFresh])
 
-  /* ================= TIMER ================= */
+  /* ================= SPEECH SYNTHESIS ================= */
+  const speakText = useCallback((text) => {
+    if (!audioEnabled || typeof window === 'undefined' || !window.speechSynthesis) return
+    try {
+      const utter = new SpeechSynthesisUtterance(text)
+      window.speechSynthesis.cancel()
+      window.speechSynthesis.speak(utter)
+    } catch (e) {
+      console.warn('Speech synthesis error:', e)
+    }
+  }, [audioEnabled])
+
+  useEffect(() => {
+    if (current?.questionText) {
+      speakText(current.questionText)
+    }
+    return () => {
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel()
+      }
+    }
+  }, [current, speakText])
+
+  /* ================= 1-SECOND TIMER & AUTOSAVE ================= */
   useEffect(() => {
     if (!current) return
 
     clearInterval(timerRef.current)
-    
+
     if (restoredSecondsLeftRef.current !== null) {
       setSecondsLeft(restoredSecondsLeftRef.current)
       restoredSecondsLeftRef.current = null
@@ -162,12 +188,6 @@ export default function Assessment() {
           setTimeout(() => handleTimeout(), 0)
           return 0
         }
-        
-        // Autosave progress periodically
-        if (s % 3 === 0 && user?._id) {
-          saveSessionProgress(questionIndex, questions, answers, s - 1)
-        }
-        
         return s - 1
       })
     }, 1000)
@@ -175,93 +195,68 @@ export default function Assessment() {
     return () => clearInterval(timerRef.current)
   }, [current])
 
-  const speakText = (text) => {
-    if (!audioEnabled || typeof window === 'undefined' || !window.speechSynthesis) return
-    try {
-      const utter = new SpeechSynthesisUtterance(text)
-      window.speechSynthesis.cancel()
-      window.speechSynthesis.speak(utter)
-    } catch (e) {
-      console.warn("Speech synthesis error:", e)
-    }
-  }
-
-  useEffect(() => {
-    if (current?.questionText) {
-      speakText(current.questionText)
-    }
-    return () => {
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.cancel()
-      }
-    }
-  }, [current, audioEnabled])
-
-  /* ================= HANDLERS ================= */
-  const handleTimeout = () => {
+  /* ================= OPTION SELECT / QUESTION TRANSITION (<10ms) ================= */
+  const handleTimeout = useCallback(() => {
     handleSelect(null, TIMER_SECONDS * 1000)
-  }
+  }, [])
 
-  const select = (opt) => {
+  const select = useCallback((opt) => {
     if (submitting) return
     const responseTime = Date.now() - startTsRef.current
     handleSelect(opt, responseTime)
-  }
+  }, [submitting])
 
-  const handleSelect = async (opt, responseTime) => {
-    const updated = [...answers, { selected: opt, responseTime }]
-    setAnswers(updated)
+  const handleSelect = useCallback((opt, responseTime) => {
+    const transitionStartTime = performance.now()
+
+    const updatedAnswers = [...answers, { selected: opt, responseTime }]
+    setAnswers(updatedAnswers)
 
     if (questionIndex < TOTAL_QUESTIONS - 1) {
-      const wasCorrect =
-        opt !== null && String(opt) === String(current.correctAnswer)
+      const wasCorrect = opt !== null && String(opt) === String(current.correctAnswer)
       const quick = responseTime < 5000
 
       const nextDifficulty = Math.min(
         5,
         Math.max(
           1,
-          current.difficulty +
+          (current.difficulty || 2) +
             (wasCorrect && quick ? 1 : 0) -
             (!wasCorrect ? 1 : 0)
         )
       )
 
-      let nextQ
-      try {
-        nextQ = await loadNextQuestion(nextDifficulty, questionIndex + 1)
-      } catch (err) {
-        nextQ = generateAdaptiveQuestion(nextDifficulty, questionIndex + 1)
-      }
+      // INSTANTANEOUS SYNCHRONOUS TRANSITION (<1ms) FROM PREFETCH CACHE / FALLBACK
+      const nextIdx = questionIndex + 1
+      const { question: nextQ, wasCacheHit } = popQuestionSync(nextDifficulty, nextIdx)
 
-      if (!nextQ) {
-        setError("All available questions have been completed! Submitting assessment...")
-        setTimeout(() => {
-          submitAssessment(updated)
-        }, 1500)
-        return
-      }
+      const transitionTimeMs = performance.now() - transitionStartTime
+      perfLogger.logTransition(transitionTimeMs, wasCacheHit, nextDifficulty)
 
-      const newQuestions = [...questions, nextQ]
-      setQuestions(newQuestions)
+      const updatedQuestions = [...questions, nextQ]
+      setQuestions(updatedQuestions)
       setCurrent(nextQ)
-      setQuestionIndex((i) => i + 1)
+      setQuestionIndex(nextIdx)
       startTsRef.current = Date.now()
 
-      saveSessionProgress(questionIndex + 1, newQuestions, updated, TIMER_SECONDS)
+      // Fire-and-forget asynchronous autosave (every 3 questions or periodic)
+      triggerAutosave(nextIdx, updatedQuestions, updatedAnswers, TIMER_SECONDS)
     } else {
-      submitAssessment(updated)
+      // Complete assessment - submit final answers
+      submitAssessment(updatedAnswers)
     }
-  }
+  }, [answers, current, popQuestionSync, questionIndex, questions, triggerAutosave])
 
-  /* ================= SUBMIT ================= */
+  /* ================= FINAL SUBMISSION ================= */
   const submitAssessment = async (finalAnswers) => {
     if (submitting) return
     setSubmitting(true)
 
     try {
-      const legacyId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36);
-      
+      perfLogger.printReport()
+
+      const legacyId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36)
+
       const synced = await syncAssessmentToPhase2({
         assessmentType: 'FULL',
         legacyAssessmentId: legacyId,
@@ -273,11 +268,7 @@ export default function Assessment() {
         throw new Error('Assessment submission failed. Is the Spring Boot backend running?')
       }
 
-      // Clear progress on completion
-      if (user?._id) {
-        await client.delete(`/api/v2/assessments/progress?externalUserId=${user._id}`).catch(() => {})
-      }
-
+      await clearSession()
       navigate('/results', { replace: true })
     } catch (err) {
       setError(err.message || 'Failed to submit assessment')
@@ -294,7 +285,7 @@ export default function Assessment() {
     )
   }
 
-  /* ================= UI ================= */
+  /* ================= UI RENDER ================= */
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50 text-black">
       <div className="max-w-3xl w-full bg-white rounded-2xl p-5 shadow-sm text-black relative">
@@ -363,14 +354,12 @@ export default function Assessment() {
 
         <div className="grid grid-cols-2 gap-3">
           {(current?.options || []).map((opt, i) => (
-            <button
+            <OptionButton
               key={i}
-              onClick={() => select(opt.text)}
+              optText={opt.text}
+              onSelect={select}
               disabled={submitting}
-              className="py-3 px-4 rounded-xl border-2 border-gray-300 font-medium text-black hover:border-primary hover:bg-primary/10 transition"
-            >
-              {submitting ? <LoadingSpinner size={18} /> : opt.text}
-            </button>
+            />
           ))}
         </div>
 
@@ -384,13 +373,13 @@ export default function Assessment() {
               <div className="flex flex-col gap-2 pt-2">
                 <button
                   onClick={handleResume}
-                  className="w-full py-2.5 bg-primary text-white rounded-xl font-bold text-sm shadow-md animate-bounce"
+                  className="w-full py-2.5 bg-primary text-white rounded-xl font-bold text-sm shadow-md transition hover:opacity-90"
                 >
                   Resume Session
                 </button>
                 <button
                   onClick={handleDiscard}
-                  className="w-full py-2.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl font-bold text-sm"
+                  className="w-full py-2.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl font-bold text-sm transition"
                 >
                   Start New Assessment
                 </button>
@@ -398,128 +387,7 @@ export default function Assessment() {
             </div>
           </div>
         )}
-
       </div>
     </div>
   )
-}
-
-/* ================= HELPERS ================= */
-
-function generateAdaptiveQuestion(difficulty, idx) {
-  const types = [
-    'arithmetic',
-    'count_dots',
-    'comparison',
-    'missing',
-    'image_based',
-    'shape_color',
-  ]
-  const type = types[randInt(0, types.length - 1)]
-
-  switch (type) {
-    case 'count_dots':
-      return generateCountDots(difficulty, idx)
-    case 'comparison':
-      return generateComparison(difficulty, idx)
-    case 'missing':
-      return generateMissing(difficulty, idx)
-    case 'image_based':
-      return generateImageQuestion(difficulty, idx)
-    case 'shape_color':
-      return generateShapeColor(difficulty, idx)
-    default:
-      return generateArithmetic(difficulty, idx)
-  }
-}
-
-function generateArithmetic(difficulty, idx) {
-  const a = randInt(1, difficulty * 5)
-  const b = randInt(1, difficulty * 5)
-  return build(`${a} + ${b} = ?`, a + b, difficulty, idx, 'arithmetic')
-}
-
-function generateCountDots(difficulty, idx) {
-  const dots = randInt(3, difficulty * 4)
-  return { ...build('How many dots?', dots, difficulty, idx, 'number_sense'), dots }
-}
-
-function generateComparison(difficulty, idx) {
-  const a = randInt(1, difficulty * 10)
-  const b = randInt(1, difficulty * 10)
-  return build(`${a} ? ${b}`, a > b ? '>' : '<', difficulty, idx, 'number_sense')
-}
-
-function generateMissing(difficulty, idx) {
-  const start = randInt(1, 10)
-  const step = randInt(1, difficulty + 1)
-  return build(
-    `Find missing: ${start}, ${start + step}, ?, ${start + step * 3}`,
-    start + step * 2,
-    difficulty,
-    idx,
-    'number_sense'
-  )
-}
-
-function generateImageQuestion(difficulty, idx) {
-  const fruits = ['Apple', 'Banana', 'Orange', 'Grapes']
-  return {
-    localId: `img-${idx}`,
-    questionType: 'spatial',
-    questionText: 'Which fruit is this?',
-    image: `/images/${fruits[idx % fruits.length].toLowerCase()}.svg`,
-    options: fruits.map((f) => ({ text: f })),
-    correctAnswer: fruits[idx % fruits.length],
-    difficulty,
-  }
-}
-
-function generateShapeColor(difficulty, idx) {
-  return {
-    localId: `shape-${idx}`,
-    questionType: 'spatial',
-    questionText: 'What color are the shapes?',
-    shapes: [
-      { shape: 'rounded-full', color: 'bg-red-500' },
-      { shape: 'rounded-full', color: 'bg-red-500' },
-    ],
-    options: generateOptions('Red'),
-    correctAnswer: 'Red',
-    difficulty,
-  }
-}
-
-function build(text, correct, difficulty, idx, questionType) {
-  return {
-    localId: `q-${idx}`,
-    questionType,
-    questionText: text,
-    options: generateOptions(String(correct)),
-    correctAnswer: String(correct),
-    difficulty,
-  }
-}
-
-function generateOptions(correct) {
-  if (!isNaN(Number(correct))) {
-    const set = new Set([String(correct)])
-    while (set.size < 4) {
-      set.add(String(Number(correct) + randInt(-5, 5)))
-    }
-    return [...set].map((v) => ({ text: v })).sort(() => Math.random() - 0.5)
-  }
-
-  const pool = ['Red', 'Blue', 'Green', 'Yellow', 'Apple', 'Banana', 'Orange', 'Grapes', '>', '<']
-  const set = new Set([correct])
-
-  while (set.size < 4) {
-    set.add(pool[randInt(0, pool.length - 1)])
-  }
-
-  return [...set].map((v) => ({ text: v })).sort(() => Math.random() - 0.5)
-}
-
-function randInt(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min
 }
