@@ -3,6 +3,7 @@ import client from '../api/springClient'
 import { getUser } from '../auth'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorBanner from '../components/ErrorBanner'
+import BuddyMascot from '../components/BuddyMascot'
 import { useNavigate } from 'react-router-dom'
 import { syncAssessmentToPhase2 } from '../utils/assessmentSync'
 import { usePrefetchCache } from '../utils/usePrefetchCache'
@@ -12,13 +13,23 @@ import { perfLogger } from '../utils/performanceMetrics'
 const TOTAL_QUESTIONS = 8
 const TIMER_SECONDS = 20
 
-// Memoized Option Button to prevent unnecessary re-renders during 1s timer countdowns
-const OptionButton = React.memo(function OptionButton({ optText, onSelect, disabled }) {
+// Memoized Option Button styled like tactile 3D Duolingo / Khan Academy Kids buttons
+const OptionButton = React.memo(function OptionButton({ optText, onSelect, disabled, index }) {
+  const colorThemes = [
+    'border-b-8 border-kid-blue bg-white hover:bg-sky-50 text-gray-800 border-2 border-sky-300',
+    'border-b-8 border-kid-green bg-white hover:bg-green-50 text-gray-800 border-2 border-green-300',
+    'border-b-8 border-kid-yellowDark bg-white hover:bg-yellow-50 text-gray-800 border-2 border-yellow-300',
+    'border-b-8 border-kid-purple bg-white hover:bg-purple-50 text-gray-800 border-2 border-purple-300'
+  ]
+  const theme = colorThemes[index % colorThemes.length]
+
   return (
     <button
       onClick={() => onSelect(optText)}
       disabled={disabled}
-      className="py-3 px-4 rounded-xl border-2 border-gray-300 font-medium text-black hover:border-primary hover:bg-primary/10 transition"
+      className={`py-5 px-6 rounded-3xl font-kid font-black text-2xl sm:text-3xl shadow-md transform transition-all duration-150 active:translate-y-1.5 focus:outline-none ${theme} ${
+        disabled ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02]'
+      }`}
     >
       {optText}
     </button>
@@ -98,13 +109,10 @@ export default function Assessment() {
       }
 
       try {
-        const fetchStart = performance.now()
         const res = await client.get('/api/v2/assessments/progress', {
-          params: { externalUserId: user._id }
+          params: { userId: user._id }
         })
-        perfLogger.logApiFetch('GET /api/v2/assessments/progress', performance.now() - fetchStart, true)
-
-        if (res.status === 200 && res.data && Array.isArray(res.data.questions) && res.data.questions.length > 0) {
+        if (res.data && Array.isArray(res.data.questions) && res.data.questions.length > 0) {
           setSavedProgress(res.data)
           setShowResumeModal(true)
         } else if (localBackup && Array.isArray(localBackup.questions) && localBackup.questions.length > 0) {
@@ -113,8 +121,7 @@ export default function Assessment() {
         } else {
           startFresh()
         }
-      } catch (_err) {
-        perfLogger.logApiFetch('GET /api/v2/assessments/progress', 0, false)
+      } catch (err) {
         if (localBackup && Array.isArray(localBackup.questions) && localBackup.questions.length > 0) {
           setSavedProgress(localBackup)
           setShowResumeModal(true)
@@ -127,154 +134,134 @@ export default function Assessment() {
     }
 
     checkSavedSession()
+  }, [user?._id, getLocalStorageBackup, startFresh])
 
-    return () => {
-      clearInterval(timerRef.current)
+  const handleResume = () => {
+    if (savedProgress) {
+      registerExistingQuestions(savedProgress.questions)
+      setQuestions(savedProgress.questions)
+      setQuestionIndex(savedProgress.currentQuestionIndex || 0)
+      setAnswers(savedProgress.answers || [])
+
+      if (typeof savedProgress.secondsLeft === 'number' && savedProgress.secondsLeft >= 0) {
+        restoredSecondsLeftRef.current = savedProgress.secondsLeft
+      }
+
+      const curDifficulty = savedProgress.difficulty || 2
+      prefetchAdjacent(curDifficulty)
     }
-  }, [])
-
-  const handleResume = useCallback(() => {
-    if (!savedProgress) return
-
-    registerExistingQuestions(savedProgress.questions)
-    const resumedQuestions = savedProgress.questions
-    const resumedAnswers = savedProgress.answers || []
-    const resumeIdx = savedProgress.currentQuestionIndex || 0
-
-    setQuestions(resumedQuestions)
-    setAnswers(resumedAnswers)
-    setQuestionIndex(resumeIdx)
-    stateRef.current = { questions: resumedQuestions, questionIndex: resumeIdx, answers: resumedAnswers }
-
-    if (savedProgress.secondsLeft !== undefined && savedProgress.secondsLeft !== null) {
-      restoredSecondsLeftRef.current = savedProgress.secondsLeft
-    }
-
     setShowResumeModal(false)
-    startTsRef.current = Date.now()
+  }
 
-    const resumedQ = resumedQuestions[resumeIdx] || resumedQuestions[0]
-    prefetchAdjacent(resumedQ?.difficulty || 2)
-  }, [savedProgress, registerExistingQuestions, prefetchAdjacent])
-
-  const handleDiscard = useCallback(async () => {
-    await clearSession()
+  const handleDiscard = () => {
+    clearSession()
     setShowResumeModal(false)
     startFresh()
-  }, [clearSession, startFresh])
+  }
 
-  /* ================= SPEECH SYNTHESIS ================= */
-  const speakText = useCallback((text) => {
-    if (!audioEnabled || typeof window === 'undefined' || !window.speechSynthesis) return
-    try {
-      const utter = new SpeechSynthesisUtterance(text)
-      window.speechSynthesis.cancel()
-      window.speechSynthesis.speak(utter)
-    } catch (e) {
-      console.warn('Speech synthesis error:', e)
-    }
-  }, [audioEnabled])
+  /* ================= SPEECH ASSIST ================= */
+  const speakText = (text) => {
+    if (!audioEnabled || !('speechSynthesis' in window)) return
+    window.speechSynthesis.cancel()
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.rate = 0.9
+    window.speechSynthesis.speak(utterance)
+  }
 
   useEffect(() => {
-    if (current?.questionText) {
+    if (current && audioEnabled) {
       speakText(current.questionText)
     }
-    return () => {
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.cancel()
-      }
-    }
-  }, [current, speakText])
+  }, [current, audioEnabled])
 
-  /* ================= FINAL SUBMISSION ================= */
-  const submitAssessment = useCallback(async (finalAnswers, finalQuestions) => {
-    if (submitting) return
+  /* ================= SUBMISSION FUNCTION ================= */
+  const submitFinalAssessment = useCallback(async (finalQuestions, finalAnswers) => {
     setSubmitting(true)
+    clearInterval(timerRef.current)
+
+    const legacyId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36)
 
     try {
-      perfLogger.printReport()
-
-      const legacyId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36)
-
-      const synced = await syncAssessmentToPhase2({
-        assessmentType: 'FULL',
+      const syncedResult = await syncAssessmentToPhase2({
+        assessmentType: 'ADAPTIVE_SCREENER',
         legacyAssessmentId: legacyId,
         questions: finalQuestions,
         answers: finalAnswers,
       })
 
-      if (!synced) {
-        throw new Error('Assessment submission failed. Is the Spring Boot backend running?')
-      }
-
-      await clearSession()
-      navigate('/results', { replace: true })
+      clearSession()
+      navigate('/results', { state: { result: syncedResult }, replace: true })
     } catch (err) {
-      setError(err.message || 'Failed to submit assessment')
-    } finally {
+      console.error('[Assessment] Submission failed:', err)
+      setError('Submission failed. Check network or server connection.')
       setSubmitting(false)
     }
-  }, [clearSession, navigate, submitting])
+  }, [navigate, clearSession])
 
-  /* ================= OPTION SELECT / QUESTION TRANSITION (<10ms) ================= */
-  const handleSelect = useCallback((opt, responseTime) => {
-    const { questions: currQuestions, questionIndex: currIdx, answers: currAnswers } = stateRef.current
-    const currQ = currQuestions[currIdx]
+  /* ================= OPTION SELECTION ================= */
+  const handleSelectRef = useRef(null)
 
-    if (!currQ || currQ.correctAnswer === undefined || currQ.correctAnswer === null) {
-      console.error('[Assessment] handleSelect encountered null/invalid current question. Aborting.')
+  const handleSelect = useCallback((optText, responseTimeMs) => {
+    const { questions: curQs, questionIndex: curIdx, answers: curAns } = stateRef.current
+    const curQ = curQs[curIdx]
+
+    if (!curQ) {
+      console.error('[Assessment] handleSelect called with null or invalid current question at index:', curIdx)
       return
     }
 
-    const transitionStartTime = performance.now()
-    const updatedAnswers = [...currAnswers, { selected: opt, responseTime }]
+    const t0 = performance.now()
 
-    if (currIdx < TOTAL_QUESTIONS - 1) {
-      const wasCorrect = opt !== null && String(opt) === String(currQ.correctAnswer)
-      const quick = responseTime < 5000
+    const isCorrect = String(optText) === String(curQ.correctAnswer)
 
-      const nextDifficulty = Math.min(
-        5,
-        Math.max(
-          1,
-          (currQ.difficulty || 2) +
-            (wasCorrect && quick ? 1 : 0) -
-            (!wasCorrect ? 1 : 0)
-        )
-      )
+    let nextDiff = curQ.difficulty || 2
+    if (isCorrect) {
+      if (responseTimeMs < 5000 && nextDiff < 5) nextDiff++
+    } else {
+      if (nextDiff > 1) nextDiff--
+    }
 
-      const nextIdx = currIdx + 1
-      const { question: nextQ, wasCacheHit } = popQuestionSync(nextDifficulty, nextIdx)
+    const newAnswer = {
+      questionId: curQ.id || curQ.localId,
+      selected: optText,
+      selectedAnswer: optText,
+      selectedOption: optText,
+      isCorrect,
+      responseTimeMs,
+      difficulty: curQ.difficulty || 2
+    }
 
+    const updatedAnswers = [...curAns, newAnswer]
+    const nextIdx = curIdx + 1
+
+    if (nextIdx < TOTAL_QUESTIONS) {
+      const { question: nextQ, source } = popQuestionSync(nextDiff, nextIdx)
       if (!nextQ || nextQ.correctAnswer === undefined || nextQ.correctAnswer === null) {
-        console.error('[Assessment] popQuestionSync returned invalid nextQ at index', nextIdx)
+        console.error('[Assessment] popQuestionSync produced invalid question for nextIdx:', nextIdx)
         return
       }
 
-      const transitionTimeMs = performance.now() - transitionStartTime
-      perfLogger.logTransition(transitionTimeMs, wasCacheHit, nextDifficulty)
+      const updatedQuestions = [...curQs, nextQ]
 
-      const updatedQuestions = [...currQuestions, nextQ]
+      const transitionMs = performance.now() - t0
+      perfLogger.logTransition(transitionMs, source === 'cache')
 
-      // Synchronize both state and ref in the same tick
-      setAnswers(updatedAnswers)
       setQuestions(updatedQuestions)
+      setAnswers(updatedAnswers)
       setQuestionIndex(nextIdx)
       stateRef.current = { questions: updatedQuestions, questionIndex: nextIdx, answers: updatedAnswers }
-
       startTsRef.current = Date.now()
-      setSecondsLeft(TIMER_SECONDS)
 
-      triggerAutosave(nextIdx, updatedQuestions, updatedAnswers, TIMER_SECONDS)
+      prefetchAdjacent(nextDiff)
+      triggerAutosave(updatedQuestions, nextIdx, updatedAnswers, nextDiff, TIMER_SECONDS)
     } else {
       setAnswers(updatedAnswers)
-      stateRef.current = { questions: currQuestions, questionIndex: currIdx, answers: updatedAnswers }
-      submitAssessment(updatedAnswers, currQuestions)
+      stateRef.current = { ...stateRef.current, answers: updatedAnswers }
+      clearSession()
+      submitFinalAssessment(curQs, updatedAnswers)
     }
-  }, [popQuestionSync, submitAssessment, triggerAutosave])
+  }, [popQuestionSync, prefetchAdjacent, triggerAutosave, clearSession, submitFinalAssessment])
 
-  /* ================= 1-SECOND TIMER ================= */
-  const handleSelectRef = useRef(handleSelect)
   useEffect(() => {
     handleSelectRef.current = handleSelect
   }, [handleSelect])
@@ -312,114 +299,183 @@ export default function Assessment() {
   const select = useCallback((opt) => {
     if (submitting) return
     const responseTime = Date.now() - startTsRef.current
-    handleSelect(opt, responseTime)
+    handleSelect(opt.text !== undefined ? opt.text : opt, responseTime)
   }, [handleSelect, submitting])
 
   if (checkingProgress || !current) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
-        <LoadingSpinner size={48} />
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-b from-sky-50 to-indigo-50 font-kid">
+        <BuddyMascot mood="cheerful" size="lg" message="Getting your quest ready..." />
+        <div className="mt-4">
+          <LoadingSpinner size={48} />
+        </div>
       </div>
     )
   }
 
+  // Calculate timer color theme
+  const timerColor =
+    secondsLeft > 10
+      ? 'bg-kid-green'
+      : secondsLeft > 5
+      ? 'bg-kid-yellow'
+      : 'bg-kid-pink animate-pulse'
+
   /* ================= UI RENDER ================= */
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50 text-black">
-      <div className="max-w-3xl w-full bg-white rounded-2xl p-5 shadow-sm text-black relative">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold text-black">Assessment</h2>
-          <div className="flex items-center gap-4">
+    <div className="min-h-screen flex items-center justify-center p-3 sm:p-6 bg-gradient-to-b from-sky-50 via-indigo-50/40 to-white text-gray-800 font-kid">
+      <div className="max-w-3xl w-full bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border-4 border-indigo-100 relative">
+        
+        {/* Top Header & Segmented Progress Bar */}
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6 pb-4 border-b-2 border-indigo-50">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">🎯</span>
+            <div>
+              <h2 className="text-2xl font-black text-gray-900">Number Quest</h2>
+              <span className="text-xs font-bold text-gray-500">
+                Question {questionIndex + 1} of {TOTAL_QUESTIONS}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setAudioEnabled(!audioEnabled)}
-              className={`text-xs px-2.5 py-1 rounded-xl font-bold border transition ${
+              className={`text-xs px-3 py-1.5 rounded-2xl font-bold border-2 transition flex items-center gap-1.5 ${
                 audioEnabled
-                  ? 'bg-green-50 text-green-600 border-green-200'
-                  : 'bg-gray-50 text-gray-400 border-gray-200'
+                  ? 'bg-green-100 text-green-800 border-green-300 shadow-sm'
+                  : 'bg-gray-100 text-gray-500 border-gray-300'
               }`}
             >
-              {audioEnabled ? '🔊 Audio ON' : '🔇 Audio OFF'}
+              {audioEnabled ? '🔊 Sound ON' : '🔇 Sound OFF'}
             </button>
-            <span className="text-sm text-black">
-              Q {questionIndex + 1}/{TOTAL_QUESTIONS}
-            </span>
           </div>
+        </div>
+
+        {/* Colorful Segmented Progress Bar */}
+        <div className="w-full bg-gray-100 h-4 rounded-full overflow-hidden mb-6 flex gap-1 p-0.5 border border-gray-200">
+          {Array.from({ length: TOTAL_QUESTIONS }).map((_, i) => (
+            <div
+              key={i}
+              className={`flex-1 rounded-full transition-all duration-300 ${
+                i < questionIndex
+                  ? 'bg-kid-green'
+                  : i === questionIndex
+                  ? 'bg-kid-blue animate-pulse'
+                  : 'bg-gray-200'
+              }`}
+            />
+          ))}
         </div>
 
         {error && <ErrorBanner message={error} />}
 
-        <div className="mb-3 text-lg font-medium text-black flex items-center gap-2">
-          <span>{current.questionText}</span>
-          <button
-            onClick={() => speakText(current.questionText)}
-            className="p-1 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-black transition"
-            title="Read Question Aloud"
-          >
-            🔊
-          </button>
+        {/* Main Question Box with Buddy Mascot */}
+        <div className="bg-gradient-to-r from-sky-50/70 to-indigo-50/70 rounded-3xl p-6 border-2 border-indigo-100 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex-1 text-center sm:text-left">
+            <div className="flex items-center justify-center sm:justify-start gap-2 mb-2">
+              <span className="text-xs font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full">
+                Level {current.difficulty} Challenge
+              </span>
+            </div>
+            <div className="text-2xl sm:text-3xl font-black text-gray-900 flex items-center justify-center sm:justify-start gap-3">
+              <span>{current.questionText}</span>
+              <button
+                onClick={() => speakText(current.questionText)}
+                className="p-2 hover:bg-white rounded-2xl text-kid-blue hover:text-kid-blueDark transition shadow-xs"
+                title="Read Question Aloud"
+              >
+                🔊
+              </button>
+            </div>
+          </div>
+
+          <BuddyMascot
+            mood="cheerful"
+            size="md"
+            message={questionIndex === 0 ? "You've got this!" : "Great focus!"}
+          />
         </div>
 
-        <div className="text-sm mb-4 text-black">
-          Difficulty: {current.difficulty} | ⏱ {secondsLeft}s
+        {/* Visual Countdown Timer Bar */}
+        <div className="mb-6">
+          <div className="flex justify-between items-center text-xs font-bold text-gray-500 mb-1">
+            <span>⏱ Time Remaining</span>
+            <span className="text-base font-black text-gray-800">{secondsLeft}s</span>
+          </div>
+          <div className="w-full bg-gray-200 h-3 rounded-full overflow-hidden">
+            <div
+              className={`h-full transition-all duration-300 rounded-full ${timerColor}`}
+              style={{ width: `${(secondsLeft / TIMER_SECONDS) * 100}%` }}
+            />
+          </div>
         </div>
 
+        {/* Visual Aids (Dots / Shapes / Images) rendered playfully */}
         {current.dots && (
-          <div className="flex gap-2 flex-wrap mb-4">
+          <div className="flex gap-3 flex-wrap justify-center mb-6 p-4 bg-sky-50/50 rounded-2xl border-2 border-dashed border-sky-200">
             {Array.from({ length: current.dots }).map((_, i) => (
-              <div key={i} className="w-5 h-5 bg-blue-500 rounded-full" />
+              <div
+                key={i}
+                className="w-8 h-8 sm:w-10 sm:h-10 bg-kid-blue rounded-full shadow-duo-blue transform hover:scale-110 transition"
+              />
             ))}
           </div>
         )}
 
         {current.shapes && (
-          <div className="flex gap-4 mb-4">
+          <div className="flex gap-5 justify-center mb-6 p-4 bg-indigo-50/50 rounded-2xl border-2 border-dashed border-indigo-200">
             {current.shapes.map((s, i) => (
-              <div key={i} className={`w-12 h-12 ${s.color} ${s.shape}`} />
+              <div key={i} className={`w-14 h-14 ${s.color} ${s.shape} drop-shadow-md`} />
             ))}
           </div>
         )}
 
         {current.image && (
-          <img
-            src={current.image}
-            alt="question"
-            loading="lazy"
-            width={160}
-            height={160}
-            className="w-40 mb-4 rounded-xl border"
-          />
+          <div className="flex justify-center mb-6">
+            <img
+              src={current.image}
+              alt="question"
+              loading="lazy"
+              className="w-48 rounded-3xl border-4 border-indigo-100 shadow-lg"
+            />
+          </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
+        {/* Tactile 3D Option Buttons Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {(current.options || []).map((opt, i) => (
             <OptionButton
               key={i}
-              optText={opt.text}
+              index={i}
+              optText={typeof opt === 'object' ? opt.text : opt}
               onSelect={select}
               disabled={submitting}
             />
           ))}
         </div>
 
+        {/* Kid-Friendly Resume Modal */}
         {showResumeModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-            <div className="bg-white rounded-3xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
-              <h3 className="text-xl font-extrabold text-black">Resume Assessment?</h3>
-              <p className="text-sm text-gray-500">
-                We found an unfinished assessment session. Would you like to resume from where you left off?
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs font-kid">
+            <div className="bg-white rounded-3xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl border-4 border-indigo-200">
+              <BuddyMascot mood="waving" size="md" />
+              <h3 className="text-2xl font-black text-gray-900">Welcome Back Buddy!</h3>
+              <p className="text-sm font-bold text-gray-600">
+                We saved your spot on Question {savedProgress?.currentQuestionIndex + 1 || 1}! Would you like to keep going?
               </p>
-              <div className="flex flex-col gap-2 pt-2">
+              <div className="flex flex-col gap-3 pt-2">
                 <button
                   onClick={handleResume}
-                  className="w-full py-2.5 bg-primary text-white rounded-xl font-bold text-sm shadow-md transition hover:opacity-90"
+                  className="kid-btn-primary w-full"
                 >
-                  Resume Session
+                  <span>⭐ Continue Adventure</span>
                 </button>
                 <button
                   onClick={handleDiscard}
-                  className="w-full py-2.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl font-bold text-sm transition"
+                  className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-2xl font-bold text-sm transition"
                 >
-                  Start New Assessment
+                  Start Over Fresh
                 </button>
               </div>
             </div>

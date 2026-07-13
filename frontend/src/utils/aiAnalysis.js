@@ -8,11 +8,12 @@ import { getUser } from '../auth'
 export async function requestAiAnalysis(assessmentId) {
   try {
     const user = getUser()
-    if (!user?._id || !assessmentId) return null
+    const externalUserId = user?._id || user?.id
+    if (!externalUserId || !assessmentId) return null
 
     const res = await springClient.post('/api/v2/ai/analyze', {
       assessmentId,
-      externalUserId: user._id,
+      externalUserId,
     })
     return res.data
   } catch (err) {

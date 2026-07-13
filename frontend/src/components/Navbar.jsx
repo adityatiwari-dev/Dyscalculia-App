@@ -62,9 +62,9 @@ export default function Navbar() {
           {role === 'parent' && (
             <>
               <Link to="/parent-dashboard" className="hover:text-primary transition font-bold text-primary">🏠 Parent Dashboard</Link>
-              <Link to="/parent-dashboard" className="hover:text-primary transition">👶 Child Progress</Link>
-              <Link to="/parent-dashboard" className="hover:text-primary transition">📑 Reports</Link>
-              <Link to="/parent-dashboard" className="hover:text-primary transition">💡 Recommendations</Link>
+              <Link to="/parent-dashboard?section=progress-section" className="hover:text-primary transition">👶 Child Progress</Link>
+              <Link to="/parent-dashboard?section=reports-section" className="hover:text-primary transition">📑 Reports</Link>
+              <Link to="/parent-dashboard?section=recommendations-section" className="hover:text-primary transition">💡 Recommendations</Link>
               <Link to="/about" className="hover:text-primary transition text-xs bg-primary/10 text-primary px-3 py-1.5 rounded-full font-bold">📚 About Dyscalculia</Link>
             </>
           )}
@@ -73,9 +73,9 @@ export default function Navbar() {
           {role === 'teacher' && (
             <>
               <Link to="/teacher-dashboard" className="hover:text-primary transition font-bold text-primary">🎓 Teacher Dashboard</Link>
-              <Link to="/teacher-dashboard" className="hover:text-primary transition">👥 Students</Link>
-              <Link to="/teacher-dashboard" className="hover:text-primary transition">📑 Reports</Link>
-              <Link to="/teacher-dashboard" className="hover:text-primary transition">📈 Analytics</Link>
+              <Link to="/teacher-dashboard?section=students-section" className="hover:text-primary transition">👥 Students</Link>
+              <Link to="/teacher-dashboard?section=reports-section" className="hover:text-primary transition">📑 Reports</Link>
+              <Link to="/teacher-dashboard?section=analytics-section" className="hover:text-primary transition">📈 Analytics</Link>
               <Link to="/about" className="hover:text-primary transition text-xs bg-primary/10 text-primary px-3 py-1.5 rounded-full font-bold">📚 About Dyscalculia</Link>
             </>
           )}
@@ -83,12 +83,12 @@ export default function Navbar() {
           {/* 4. ADMIN NAVBAR */}
           {role === 'admin' && (
             <>
-              <Link to="/admin" className="hover:text-primary transition font-bold text-primary">🛠️ Admin Dashboard</Link>
-              <Link to="/admin" className="hover:text-primary transition">❓ Manage Questions</Link>
-              <Link to="/admin" className="hover:text-primary transition">👥 Manage Users</Link>
-              <Link to="/admin" className="hover:text-primary transition">📑 Reports</Link>
-              <Link to="/admin" className="hover:text-primary transition">💬 Feedback</Link>
-              <Link to="/admin" className="hover:text-primary transition">📈 Analytics</Link>
+              <Link to="/admin?tab=dashboard" className="hover:text-primary transition font-bold text-primary">🛠️ Admin Dashboard</Link>
+              <Link to="/admin?tab=questions" className="hover:text-primary transition">❓ Manage Questions</Link>
+              <Link to="/admin?tab=users" className="hover:text-primary transition">👥 Manage Users</Link>
+              <Link to="/admin?tab=assessments" className="hover:text-primary transition">📑 Reports</Link>
+              <Link to="/admin?tab=assessments" className="hover:text-primary transition">💬 Feedback</Link>
+              <Link to="/admin?tab=dashboard" className="hover:text-primary transition">📈 Analytics</Link>
             </>
           )}
         </nav>
@@ -224,7 +224,7 @@ export default function Navbar() {
                     </Link>
                     <Link
                       onClick={() => setOpen(false)}
-                      to="/parent-dashboard"
+                      to="/parent-dashboard?section=progress-section"
                       className="flex items-center gap-3 px-4 py-3.5 rounded-xl bg-gray-50 hover:bg-gray-100 text-black font-semibold transition"
                     >
                       <span className="text-xl">👶</span>
@@ -232,7 +232,7 @@ export default function Navbar() {
                     </Link>
                     <Link
                       onClick={() => setOpen(false)}
-                      to="/parent-dashboard"
+                      to="/parent-dashboard?section=reports-section"
                       className="flex items-center gap-3 px-4 py-3.5 rounded-xl bg-gray-50 hover:bg-gray-100 text-black font-semibold transition"
                     >
                       <span className="text-xl">📑</span>
@@ -240,7 +240,7 @@ export default function Navbar() {
                     </Link>
                     <Link
                       onClick={() => setOpen(false)}
-                      to="/parent-dashboard"
+                      to="/parent-dashboard?section=recommendations-section"
                       className="flex items-center gap-3 px-4 py-3.5 rounded-xl bg-gray-50 hover:bg-gray-100 text-black font-semibold transition"
                     >
                       <span className="text-xl">💡</span>
@@ -270,7 +270,7 @@ export default function Navbar() {
                     </Link>
                     <Link
                       onClick={() => setOpen(false)}
-                      to="/teacher-dashboard"
+                      to="/teacher-dashboard?section=students-section"
                       className="flex items-center gap-3 px-4 py-3.5 rounded-xl bg-gray-50 hover:bg-gray-100 text-black font-semibold transition"
                     >
                       <span className="text-xl">👥</span>
@@ -278,7 +278,7 @@ export default function Navbar() {
                     </Link>
                     <Link
                       onClick={() => setOpen(false)}
-                      to="/teacher-dashboard"
+                      to="/teacher-dashboard?section=reports-section"
                       className="flex items-center gap-3 px-4 py-3.5 rounded-xl bg-gray-50 hover:bg-gray-100 text-black font-semibold transition"
                     >
                       <span className="text-xl">📑</span>
@@ -286,7 +286,7 @@ export default function Navbar() {
                     </Link>
                     <Link
                       onClick={() => setOpen(false)}
-                      to="/teacher-dashboard"
+                      to="/teacher-dashboard?section=analytics-section"
                       className="flex items-center gap-3 px-4 py-3.5 rounded-xl bg-gray-50 hover:bg-gray-100 text-black font-semibold transition"
                     >
                       <span className="text-xl">📈</span>
@@ -308,7 +308,7 @@ export default function Navbar() {
                   <>
                     <Link
                       onClick={() => setOpen(false)}
-                      to="/admin"
+                      to="/admin?tab=dashboard"
                       className="flex items-center gap-3 px-4 py-3.5 rounded-xl bg-primary/10 border border-primary/20 text-black font-bold transition"
                     >
                       <span className="text-xl">🛠️</span>
@@ -316,7 +316,7 @@ export default function Navbar() {
                     </Link>
                     <Link
                       onClick={() => setOpen(false)}
-                      to="/admin"
+                      to="/admin?tab=questions"
                       className="flex items-center gap-3 px-4 py-3.5 rounded-xl bg-gray-50 hover:bg-gray-100 text-black font-semibold transition"
                     >
                       <span className="text-xl">❓</span>
@@ -324,7 +324,7 @@ export default function Navbar() {
                     </Link>
                     <Link
                       onClick={() => setOpen(false)}
-                      to="/admin"
+                      to="/admin?tab=users"
                       className="flex items-center gap-3 px-4 py-3.5 rounded-xl bg-gray-50 hover:bg-gray-100 text-black font-semibold transition"
                     >
                       <span className="text-xl">👥</span>
@@ -332,7 +332,7 @@ export default function Navbar() {
                     </Link>
                     <Link
                       onClick={() => setOpen(false)}
-                      to="/admin"
+                      to="/admin?tab=assessments"
                       className="flex items-center gap-3 px-4 py-3.5 rounded-xl bg-gray-50 hover:bg-gray-100 text-black font-semibold transition"
                     >
                       <span className="text-xl">📑</span>
@@ -340,7 +340,7 @@ export default function Navbar() {
                     </Link>
                     <Link
                       onClick={() => setOpen(false)}
-                      to="/admin"
+                      to="/admin?tab=assessments"
                       className="flex items-center gap-3 px-4 py-3.5 rounded-xl bg-gray-50 hover:bg-gray-100 text-black font-semibold transition"
                     >
                       <span className="text-xl">💬</span>
@@ -348,7 +348,7 @@ export default function Navbar() {
                     </Link>
                     <Link
                       onClick={() => setOpen(false)}
-                      to="/admin"
+                      to="/admin?tab=dashboard"
                       className="flex items-center gap-3 px-4 py-3.5 rounded-xl bg-gray-50 hover:bg-gray-100 text-black font-semibold transition"
                     >
                       <span className="text-xl">📈</span>

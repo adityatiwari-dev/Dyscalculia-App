@@ -77,26 +77,47 @@ export function useAssessmentAutosave(user) {
   }, [sendToServerAsync])
 
   // Trigger autosave if conditions met (every 3 questions OR explicit trigger)
-  const triggerAutosave = useCallback((idx, questions, answers, secondsLeft, force = false) => {
+  const triggerAutosave = useCallback((arg1, arg2, arg3, arg4, arg5, arg6) => {
+    let questions, currentQuestionIndex, answers, difficulty, secondsLeft, force
+    if (arg1 && typeof arg1 === 'object' && !Array.isArray(arg1)) {
+      questions = arg1.questions
+      currentQuestionIndex = arg1.currentQuestionIndex
+      answers = arg1.answers
+      difficulty = arg1.difficulty
+      secondsLeft = arg1.secondsLeft
+      force = Boolean(arg1.force)
+    } else {
+      questions = arg1
+      currentQuestionIndex = arg2
+      answers = arg3
+      difficulty = arg4
+      secondsLeft = arg5
+      force = Boolean(arg6)
+    }
+
+    const qArray = Array.isArray(questions) ? questions : []
+    const aArray = Array.isArray(answers) ? answers : []
+    const idxVal = Number(currentQuestionIndex) || 0
+    const diffVal = Number(difficulty) || qArray[idxVal]?.difficulty || 2
+    const secVal = Number(secondsLeft) || 30
+
     const payload = {
-      assessmentType: 'FULL',
-      questions,
-      answers,
-      currentQuestionIndex: idx,
-      secondsLeft,
-      difficulty: questions[idx]?.difficulty || 2,
-      savedAt: Date.now()
+      assessmentType: 'ADAPTIVE_SCREENER',
+      questions: qArray,
+      answers: aArray,
+      currentQuestionIndex: idxVal,
+      secondsLeft: secVal,
+      difficulty: diffVal
     }
 
     latestSnapshotRef.current = payload
     saveToLocalStorage(payload)
 
-    // Check frequency: force, OR every 3 answered questions
-    const answeredCount = idx
-    const isEveryThreeQuestions = answeredCount > 0 && answeredCount % 3 === 0 && lastSavedIndexRef.current !== idx
+    const answeredCount = idxVal
+    const isEveryThreeQuestions = answeredCount > 0 && answeredCount % 3 === 0 && lastSavedIndexRef.current !== idxVal
 
     if (force || isEveryThreeQuestions) {
-      lastSavedIndexRef.current = idx
+      lastSavedIndexRef.current = idxVal
       setTimeout(() => {
         if (sendToServerRef.current) {
           sendToServerRef.current(payload, 0)

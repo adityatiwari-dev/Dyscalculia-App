@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import springClient from '../api/springClient'
 import { getUser } from '../auth'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -221,9 +222,21 @@ export default function TeacherDashboard() {
     }
   }
 
+  const [searchParams] = useSearchParams()
+
   useEffect(() => {
     fetchStudents()
   }, [])
+
+  useEffect(() => {
+    const section = searchParams.get('section')
+    if (section) {
+      setTimeout(() => {
+        const el = document.getElementById(section)
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 100)
+    }
+  }, [searchParams, selectedStudent])
 
   useEffect(() => {
     if (selectedStudent) {
@@ -274,7 +287,7 @@ export default function TeacherDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
           {/* Student Directory */}
-          <div className="md:col-span-2 bg-white border border-gray-100 rounded-2xl p-5 shadow-xs space-y-4">
+          <div id="students-section" className="md:col-span-2 bg-white border border-gray-100 rounded-2xl p-5 shadow-xs space-y-4">
             <div className="flex flex-col md:flex-row justify-between gap-3">
               <h2 className="text-lg font-bold text-black">Student Directory</h2>
               <input
@@ -414,7 +427,7 @@ export default function TeacherDashboard() {
 
         {/* Selected Student Detail Panel */}
         {selectedStudent && (
-          <div className="border-t border-gray-200 pt-6 mt-6 space-y-6">
+          <div id="analytics-section" className="border-t border-gray-200 pt-6 mt-6 space-y-6">
             <div className="flex justify-between items-center">
               <h3 className="text-xl font-extrabold text-black">
                 Performance Breakdown: <span className="text-primary">{selectedStudent.name}</span>
@@ -530,7 +543,7 @@ export default function TeacherDashboard() {
                   </div>
 
                   {/* History List */}
-                  <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-xs space-y-4">
+                  <div id="reports-section" className="bg-white border border-gray-100 rounded-2xl p-5 shadow-xs space-y-4">
                     <div className="flex justify-between items-center">
                       <h4 className="text-sm font-bold text-black uppercase tracking-wider">Assessment History</h4>
                       <button

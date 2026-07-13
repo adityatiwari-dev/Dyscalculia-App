@@ -44,17 +44,17 @@ function App() {
         <main className="flex-1">
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/assessment" element={<ProtectedRoute><Assessment /></ProtectedRoute>} />
-            <Route path="/screening" element={<ProtectedRoute><Screening /></ProtectedRoute>} />
-            <Route path="/results" element={<ProtectedRoute><Results /></ProtectedRoute>} />
-            <Route path="/history" element={<ProtectedRoute><AssessmentHistory /></ProtectedRoute>} />
-            <Route path="/progress" element={<ProtectedRoute><ProgressDashboard /></ProtectedRoute>} />
-            <Route path="/parent-dashboard" element={<ProtectedRoute><ParentDashboard /></ProtectedRoute>} />
-            <Route path="/teacher-dashboard" element={<ProtectedRoute><TeacherDashboard /></ProtectedRoute>} />
-            <Route path="/admin" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
-            <Route path="/ai-report/:assessmentId" element={<ProtectedRoute><AiReport /></ProtectedRoute>} />
-            <Route path="/activities" element={<ProtectedRoute><Activities /></ProtectedRoute>} />
-            <Route path="/practice" element={<ProtectedRoute><Practice /></ProtectedRoute>} />
+            <Route path="/assessment" element={<ProtectedRoute allowedRoles={['student']}><Assessment /></ProtectedRoute>} />
+            <Route path="/screening" element={<ProtectedRoute allowedRoles={['student']}><Screening /></ProtectedRoute>} />
+            <Route path="/results" element={<ProtectedRoute allowedRoles={['student']}><Results /></ProtectedRoute>} />
+            <Route path="/history" element={<ProtectedRoute allowedRoles={['student']}><AssessmentHistory /></ProtectedRoute>} />
+            <Route path="/progress" element={<ProtectedRoute allowedRoles={['student']}><ProgressDashboard /></ProtectedRoute>} />
+            <Route path="/parent-dashboard" element={<ProtectedRoute allowedRoles={['parent']}><ParentDashboard /></ProtectedRoute>} />
+            <Route path="/teacher-dashboard" element={<ProtectedRoute allowedRoles={['teacher']}><TeacherDashboard /></ProtectedRoute>} />
+            <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><AdminPanel /></ProtectedRoute>} />
+            <Route path="/ai-report/:assessmentId" element={<ProtectedRoute allowedRoles={['student', 'parent', 'teacher', 'admin']}><AiReport /></ProtectedRoute>} />
+            <Route path="/activities" element={<ProtectedRoute allowedRoles={['student']}><Activities /></ProtectedRoute>} />
+            <Route path="/practice" element={<ProtectedRoute allowedRoles={['student']}><Practice /></ProtectedRoute>} />
             <Route path="/about" element={<AboutDyscalculia />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />

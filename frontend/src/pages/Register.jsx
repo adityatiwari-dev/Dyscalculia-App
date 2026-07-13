@@ -108,8 +108,7 @@ export default function Register() {
   const roleOptions = [
     { id: 'student', label: '🎒 Student', desc: 'Take fun assessments & activities' },
     { id: 'parent', label: '🏠 Parent', desc: 'Monitor your child’s progress' },
-    { id: 'teacher', label: '🎓 Teacher', desc: 'Track students & analytics' },
-    { id: 'admin', label: '🛠️ Admin', desc: 'Manage system & users' }
+    { id: 'teacher', label: '🎓 Teacher', desc: 'Track students & analytics' }
   ]
 
   return (
@@ -121,7 +120,7 @@ export default function Register() {
         </div>
 
         {/* Dynamic Role Selection Tabs */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6" role="radiogroup" aria-label="Select Role">
+        <div className="grid grid-cols-3 gap-2 mb-6" role="radiogroup" aria-label="Select Role">
           {roleOptions.map((opt) => (
             <button
               key={opt.id}

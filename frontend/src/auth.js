@@ -20,12 +20,32 @@ export function logout(){
 }
 
 export function setUser(user){
+  if (user && typeof user === 'object') {
+    const userId = user.id || user._id
+    if (userId) {
+      user.id = userId
+      user._id = userId
+    }
+  }
   localStorage.setItem(USER_KEY, JSON.stringify(user))
 }
 
 export function getUser(){
   const v = localStorage.getItem(USER_KEY)
-  return v ? JSON.parse(v) : null
+  if (!v) return null
+  try {
+    const user = JSON.parse(v)
+    if (user && typeof user === 'object') {
+      const userId = user.id || user._id
+      if (userId) {
+        user.id = userId
+        user._id = userId
+      }
+    }
+    return user
+  } catch (e) {
+    return null
+  }
 }
 
 export default {

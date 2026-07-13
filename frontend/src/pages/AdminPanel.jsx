@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import springClient from '../api/springClient'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorBanner from '../components/ErrorBanner'
@@ -25,7 +26,23 @@ function extractArray(payload, expectedKey) {
 }
 
 export default function AdminPanel() {
-  const [activeTab, setActiveTab] = useState('dashboard')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const initialTab = searchParams.get('tab') || 'dashboard'
+  const [activeTab, setActiveTabState] = useState(initialTab)
+
+  useEffect(() => {
+    const tab = searchParams.get('tab')
+    if (tab && ['dashboard', 'users', 'assessments', 'questions'].includes(tab)) {
+      setActiveTabState(tab)
+    } else if (!tab) {
+      setActiveTabState('dashboard')
+    }
+  }, [searchParams])
+
+  const setActiveTab = (tab) => {
+    setActiveTabState(tab)
+    setSearchParams({ tab })
+  }
   const [stats, setStats] = useState({ totalUsers: 0, totalAssessments: 0 })
   const [users, setUsers] = useState([])
   const [assessments, setAssessments] = useState([])

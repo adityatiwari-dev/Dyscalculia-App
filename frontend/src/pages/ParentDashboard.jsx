@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import springClient from '../api/springClient'
 import { getUser } from '../auth'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -65,9 +66,10 @@ export default function ParentDashboard() {
   const [submittingNote, setSubmittingNote] = useState(false)
 
   const parent = getUser()
+  const parentId = parent?._id || parent?.id
 
   const fetchChildren = async () => {
-    if (!parent?._id) {
+    if (!parentId) {
       setError('Please sign in to view linked children.')
       setLoading(false)
       return
@@ -76,14 +78,14 @@ export default function ParentDashboard() {
     try {
       setLoading(true)
       const res = await springClient.get('/api/v2/users/children', {
-        params: { parentExternalUserId: parent._id }
+        params: { parentExternalUserId: parentId }
       })
       setChildren(res.data)
       setError('')
     } catch (err) {
       setError(
         err?.response?.data?.message ||
-        'Unable to load children list. Is the Spring Boot backend running?'
+        'Failed to fetch linked children. Is phase2-backend running?'
       )
     } finally {
       setLoading(false)
@@ -102,12 +104,13 @@ export default function ParentDashboard() {
 
     try {
       await springClient.post('/api/v2/users/link-child', {
-        parentExternalUserId: parent._id,
-        childExternalUserId: childExternalId.trim()
+        parentExternalUserId: parentId,
+        childExternalUserId: childExternalId.trim(),
+        studentCode: childExternalId.trim()
       })
       setLinkSuccess(`Successfully linked child: ${childExternalId}`)
       setChildExternalId('')
-      fetchChildren() // refresh list
+      await fetchChildren() // refresh list immediately
     } catch (err) {
       setLinkError(
         err?.response?.data?.message ||
@@ -146,7 +149,7 @@ export default function ParentDashboard() {
       })
       setObservations(obsRes.data)
     } catch (err) {
-      console.warn("Error fetching child details:", err)
+      console.error("Error loading child details:", err)
     } finally {
       setDetailLoading(false)
     }
@@ -160,7 +163,7 @@ export default function ParentDashboard() {
     try {
       const res = await springClient.post('/api/v2/observations', {
         studentExternalUserId: selectedChild.externalUserId,
-        parentExternalUserId: parent._id,
+        parentExternalUserId: parentId,
         observationText: newObservationText.trim()
       })
       setObservations(prev => [res.data, ...prev])
@@ -233,9 +236,21 @@ export default function ParentDashboard() {
     }
   }
 
+  const [searchParams] = useSearchParams()
+
   useEffect(() => {
     fetchChildren()
   }, [])
+
+  useEffect(() => {
+    const section = searchParams.get('section')
+    if (section) {
+      setTimeout(() => {
+        const el = document.getElementById(section)
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 100)
+    }
+  }, [searchParams, selectedChild])
 
   // Refetch child details if period type changes
   useEffect(() => {
@@ -286,7 +301,7 @@ export default function ParentDashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           {/* Children List */}
-          <div className="lg:col-span-2 space-y-4">
+          <div id="children-section" className="lg:col-span-2 space-y-4">
             <h3 className="text-lg font-bold">Linked Children</h3>
             {children.length === 0 ? (
               <div className="bg-white border rounded-2xl p-6 text-center text-gray-500">
@@ -380,7 +395,7 @@ export default function ParentDashboard() {
 
         {/* Selected Child Detail Panel */}
         {selectedChild && (
-          <div className="border-t border-gray-200 pt-6 mt-6 space-y-6">
+          <div id="progress-section" className="border-t border-gray-200 pt-6 mt-6 space-y-6">
             <div className="flex justify-between items-center">
               <h3 className="text-xl font-extrabold text-black">
                 Performance Breakdown: <span className="text-primary">{selectedChild.name}</span>
@@ -495,7 +510,7 @@ export default function ParentDashboard() {
                 </div>
 
                 {/* Child Assessment History Section */}
-                <div className="bg-white p-6 rounded-2xl shadow-xs border border-gray-100 space-y-4">
+                <div id="reports-section" className="bg-white p-6 rounded-2xl shadow-xs border border-gray-100 space-y-4">
                   <div className="flex justify-between items-center">
                     <h4 className="text-lg font-bold text-black">Assessment History & AI Reports</h4>
                     <button
@@ -543,7 +558,7 @@ export default function ParentDashboard() {
                 </div>
 
                 {/* Parent Observations Section */}
-                <div className="bg-white p-6 rounded-2xl shadow-xs border border-gray-100 space-y-4">
+                <div id="recommendations-section" className="bg-white p-6 rounded-2xl shadow-xs border border-gray-100 space-y-4">
                   <h4 className="text-lg font-bold text-black">Behavior & Progress Observations</h4>
                   
                   <form onSubmit={handleSaveObservation} className="space-y-3">

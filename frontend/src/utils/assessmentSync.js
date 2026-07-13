@@ -15,22 +15,23 @@ export async function syncAssessmentToPhase2({
 }) {
   try {
     const user = getUser()
-    if (!user?._id) return null
+    const externalUserId = user?._id || user?.id
+    if (!externalUserId) return null
 
     const questionItems = questions.map((q, idx) => {
       const a = answers[idx] || {}
-      const selected = a.selected ?? a.selectedAnswer ?? null
+      const selected = a.selected ?? a.selectedAnswer ?? a.selectedOption ?? null
       const isCorrect =
-        selected !== null && String(selected) === String(q.correctAnswer)
+        a.isCorrect ?? (selected !== null && String(selected) === String(q.correctAnswer))
 
       return {
         sequenceNumber: idx + 1,
-        questionType: q.questionType,
-        questionText: q.questionText,
+        questionType: q.questionType || 'ADAPTIVE',
+        questionText: q.questionText || '',
         correctAnswer: q.correctAnswer != null ? String(q.correctAnswer) : null,
         selectedAnswer: selected != null ? String(selected) : null,
-        isCorrect,
-        responseTimeMs: a.responseTime || 0,
+        isCorrect: Boolean(isCorrect),
+        responseTimeMs: a.responseTimeMs ?? a.responseTime ?? 0,
         difficulty: q.difficulty ?? null,
         subtype: q.subtype ?? subtype ?? null,
       }
@@ -54,7 +55,7 @@ export async function syncAssessmentToPhase2({
         : null
 
     const res = await springClient.post('/api/v2/assessments/sync', {
-      externalUserId: user._id,
+      externalUserId: externalUserId,
       userProfile: {
         email: user.email,
         name: user.name,
