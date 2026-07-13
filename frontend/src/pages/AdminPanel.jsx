@@ -3,6 +3,27 @@ import springClient from '../api/springClient'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorBanner from '../components/ErrorBanner'
 
+/**
+ * Universal Response Normalizer
+ * Extracts an array safely from any API response payload:
+ * - Direct arrays: [...]
+ * - Envelope objects: { data: [...] }, { content: [...] }, { items: [...] }
+ * - Specific key envelope: { [expectedKey]: [...] }
+ * - Empty / null / 204 No Content: []
+ */
+function extractArray(payload, expectedKey) {
+  if (Array.isArray(payload)) return payload
+  if (payload && typeof payload === 'object') {
+    if (expectedKey && Array.isArray(payload[expectedKey])) return payload[expectedKey]
+    if (Array.isArray(payload.content)) return payload.content
+    if (Array.isArray(payload.data)) return payload.data
+    if (Array.isArray(payload.items)) return payload.items
+    const firstArray = Object.values(payload).find(v => Array.isArray(v))
+    if (firstArray) return firstArray
+  }
+  return []
+}
+
 export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [stats, setStats] = useState({ totalUsers: 0, totalAssessments: 0 })
@@ -35,36 +56,74 @@ export default function AdminPanel() {
   const fetchStats = async () => {
     try {
       const res = await springClient.get('/api/v2/admin/stats')
-      setStats(res.data)
+      const data = res?.data || {}
+      setStats({
+        totalUsers: Number(data.totalUsers ?? data?.data?.totalUsers ?? 0),
+        totalAssessments: Number(data.totalAssessments ?? data?.data?.totalAssessments ?? 0)
+      })
     } catch (err) {
       console.warn('Failed to load stats:', err)
+      setStats({ totalUsers: 0, totalAssessments: 0 })
     }
   }
 
   const fetchUsers = async () => {
     try {
       const res = await springClient.get('/api/v2/admin/users')
-      setUsers(res.data)
+      const rawArray = extractArray(res?.data, 'users')
+      const cleanUsers = rawArray.map(u => ({
+        id: String(u?.id || crypto.randomUUID()),
+        name: String(u?.name || ''),
+        email: String(u?.email || ''),
+        role: String(u?.role || 'student'),
+        grade: String(u?.grade || ''),
+        age: u?.age ?? ''
+      }))
+      setUsers(cleanUsers)
     } catch (err) {
       console.warn('Failed to load users:', err)
+      setUsers([])
     }
   }
 
   const fetchAssessments = async () => {
     try {
       const res = await springClient.get('/api/v2/admin/assessments')
-      setAssessments(res.data)
+      const rawArray = extractArray(res?.data, 'assessments')
+      const cleanAssessments = rawArray.map(a => ({
+        id: String(a?.id || crypto.randomUUID()),
+        user: {
+          name: String(a?.user?.name || ''),
+          email: String(a?.user?.email || '')
+        },
+        assessmentType: String(a?.assessmentType || 'FULL'),
+        totalScore: Number(a?.totalScore || 0),
+        accuracy: Number(a?.accuracy || 0)
+      }))
+      setAssessments(cleanAssessments)
     } catch (err) {
       console.warn('Failed to load assessments:', err)
+      setAssessments([])
     }
   }
 
   const fetchQuestions = async () => {
     try {
       const res = await springClient.get('/api/v2/questions')
-      setQuestions(res.data)
+      const rawArray = extractArray(res?.data, 'questions')
+      const cleanQuestions = rawArray.map(q => ({
+        id: String(q?.id || crypto.randomUUID()),
+        questionType: String(q?.questionType || 'arithmetic'),
+        questionText: String(q?.questionText || ''),
+        topic: String(q?.topic || 'ADDITION'),
+        difficulty: String(q?.difficulty || 'EASY'),
+        options: Array.isArray(q?.options) ? q.options : ['', '', '', ''],
+        correctAnswer: String(q?.correctAnswer || '')
+      }))
+      setQuestions(cleanQuestions)
     } catch (err) {
       console.warn('Failed to load questions:', err)
+      setQuestions([])
     }
   }
 
@@ -117,7 +176,47 @@ export default function AdminPanel() {
     }
   }
 
-  // Question Form Submission
+  // Question Actions
+  const handleEditQuestionClick = (q) => {
+    setEditingQuestion(q)
+    setQuestionText(q.questionText)
+    setQuestionType(q.questionType)
+    setTopic(q.topic)
+    setDifficulty(q.difficulty)
+    setOptions(Array.isArray(q.options) && q.options.length > 0 ? q.options : ['', '', '', ''])
+    setCorrectAnswer(q.correctAnswer)
+    setShowQuestionModal(true)
+    setModalError('')
+  }
+
+  const handleAddQuestionClick = () => {
+    setEditingQuestion(null)
+    setQuestionText('')
+    setQuestionType('arithmetic')
+    setTopic('ADDITION')
+    setDifficulty('EASY')
+    setOptions(['', '', '', ''])
+    setCorrectAnswer('')
+    setShowQuestionModal(true)
+    setModalError('')
+  }
+
+  const handleDeleteQuestion = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this question?')) return
+    try {
+      await springClient.delete(`/api/v2/questions/${id}`)
+      fetchQuestions()
+    } catch (err) {
+      alert('Failed to delete question.')
+    }
+  }
+
+  const handleOptionChange = (idx, value) => {
+    const updated = [...options]
+    updated[idx] = value
+    setOptions(updated)
+  }
+
   const handleSaveQuestion = async (e) => {
     e.preventDefault()
     setModalError('')
@@ -149,60 +248,19 @@ export default function AdminPanel() {
     }
   }
 
-  const handleEditQuestionClick = (q) => {
-    setEditingQuestion(q)
-    setQuestionText(q.questionText)
-    setQuestionType(q.questionType)
-    setTopic(q.topic)
-    setDifficulty(q.difficulty)
-    setOptions(q.options)
-    setCorrectAnswer(q.correctAnswer)
-    setShowQuestionModal(true)
-    setModalError('')
-  }
-
-  const handleAddQuestionClick = () => {
-    setEditingQuestion(null)
-    setQuestionText('')
-    setQuestionType('arithmetic')
-    setTopic('ADDITION')
-    setDifficulty('EASY')
-    setOptions(['', '', '', ''])
-    setCorrectAnswer('')
-    setShowQuestionModal(true)
-    setModalError('')
-  }
-
-  const handleDeleteQuestion = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this question?')) return
-    try {
-      await springClient.delete(`/api/v2/questions/${id}`)
-      fetchQuestions()
-    } catch (err) {
-      alert('Failed to delete question.')
-    }
-  }
-
-  // Option text updater
-  const handleOptionChange = (idx, value) => {
-    const updated = [...options]
-    updated[idx] = value
-    setOptions(updated)
-  }
-
-  // Filter lists
-  const filteredUsers = users.filter(u =>
-    (u.name && u.name.toLowerCase().includes(userQuery.toLowerCase())) ||
-    (u.email && u.email.toLowerCase().includes(userQuery.toLowerCase()))
+  // Guaranteed safe filtering on normalized arrays
+  const filteredUsers = (Array.isArray(users) ? users : []).filter(u =>
+    (u.name || '').toLowerCase().includes(userQuery.toLowerCase()) ||
+    (u.email || '').toLowerCase().includes(userQuery.toLowerCase())
   )
 
-  const filteredAssessments = assessments.filter(a =>
-    a.id.toLowerCase().includes(assessmentQuery.toLowerCase()) ||
-    (a.user?.name && a.user.name.toLowerCase().includes(assessmentQuery.toLowerCase()))
+  const filteredAssessments = (Array.isArray(assessments) ? assessments : []).filter(a =>
+    (a.id || '').toLowerCase().includes(assessmentQuery.toLowerCase()) ||
+    (a.user?.name || '').toLowerCase().includes(assessmentQuery.toLowerCase())
   )
 
-  const filteredQuestions = questions.filter(q => {
-    const matchesQuery = q.questionText.toLowerCase().includes(questionQuery.toLowerCase())
+  const filteredQuestions = (Array.isArray(questions) ? questions : []).filter(q => {
+    const matchesQuery = (q.questionText || '').toLowerCase().includes(questionQuery.toLowerCase())
     const matchesTopic = !questionTopicFilter || q.topic === questionTopicFilter
     const matchesDiff = !questionDiffFilter || q.difficulty === questionDiffFilter
     return matchesQuery && matchesTopic && matchesDiff

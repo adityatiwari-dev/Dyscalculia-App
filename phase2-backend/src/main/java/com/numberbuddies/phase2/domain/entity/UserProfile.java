@@ -60,16 +60,33 @@ public class UserProfile {
     @Column(name = "consent_date")
     private OffsetDateTime consentDate;
 
+    @Column(name = "student_code", unique = true, length = 32)
+    private String studentCode;
+
     @PrePersist
     void onCreate() {
         OffsetDateTime now = OffsetDateTime.now();
         createdAt = now;
         updatedAt = now;
+        if (studentCode == null && "student".equalsIgnoreCase(role)) {
+            studentCode = "NB-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        }
     }
 
     @PreUpdate
     void onUpdate() {
         updatedAt = OffsetDateTime.now();
+    }
+
+    public String getStudentCode() {
+        if (studentCode == null && "student".equalsIgnoreCase(role) && id != null) {
+            return "NB-" + id.toString().substring(0, 6).toUpperCase();
+        }
+        return studentCode;
+    }
+
+    public void setStudentCode(String studentCode) {
+        this.studentCode = studentCode;
     }
 
     public UUID getId() {

@@ -28,7 +28,7 @@ public class TeacherController {
     public ResponseEntity<Void> linkStudent(
             @Valid @RequestBody LinkStudentRequest request
     ) {
-        userService.linkStudentToTeacher(request.getTeacherExternalUserId(), request.getStudentExternalUserId());
+        userService.linkStudentToTeacher(request);
         return ResponseEntity.ok().build();
     }
 

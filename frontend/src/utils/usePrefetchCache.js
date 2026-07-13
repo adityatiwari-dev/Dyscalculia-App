@@ -4,7 +4,7 @@ import { perfLogger } from './performanceMetrics'
 
 /**
  * Custom hook for adaptive question prefetching & caching.
- * Guarantees <10ms instantaneous question transitions.
+ * Guarantees <10ms instantaneous question transitions and ALWAYS returns a valid question object.
  */
 export function usePrefetchCache() {
   // Map<difficultyLevel (1..5), Array<QuestionObject>>
@@ -26,10 +26,24 @@ export function usePrefetchCache() {
     if (q?.localId) servedIdsRef.current.add(String(q.localId))
   }
 
+  // Helper: validate question object
+  const isValidQuestion = (q) => {
+    return q &&
+      typeof q === 'object' &&
+      q.correctAnswer !== undefined &&
+      q.correctAnswer !== null &&
+      q.questionText &&
+      Array.isArray(q.options) &&
+      q.options.length > 0
+  }
+
+  // Tracks difficulties that returned 204 No Content so we never loop requesting them
+  const exhaustedDifficultiesRef = useRef(new Set())
+
   // Background fetcher for a specific difficulty level
   const fetchQuestionBackground = useCallback(async (difficulty) => {
     const diffKey = Math.min(5, Math.max(1, difficulty))
-    if (inFlightRef.current.has(diffKey)) return
+    if (inFlightRef.current.has(diffKey) || exhaustedDifficultiesRef.current.has(diffKey)) return
 
     const currentQueue = cacheRef.current.get(diffKey) || []
     if (currentQueue.length >= 3) return
@@ -49,22 +63,29 @@ export function usePrefetchCache() {
       const durationMs = performance.now() - startTime
       perfLogger.logApiFetch('GET /api/v2/questions/adaptive', durationMs, true)
 
+      if (res.status === 204) {
+        exhaustedDifficultiesRef.current.add(diffKey)
+        return
+      }
+
       if (res.status === 200 && res.data && res.data.id) {
         const dbQ = res.data
-        if (!servedIdsRef.current.has(String(dbQ.id))) {
+        if (!servedIdsRef.current.has(String(dbQ.id)) && dbQ.correctAnswer !== undefined && dbQ.correctAnswer !== null) {
           const formattedQ = {
             id: dbQ.id,
             localId: `db-${dbQ.id}`,
-            questionType: dbQ.questionType,
-            questionText: dbQ.questionText,
-            options: dbQ.options.map(opt => ({ text: opt })),
-            correctAnswer: dbQ.correctAnswer,
+            questionType: dbQ.questionType || 'arithmetic',
+            questionText: dbQ.questionText || 'Solve the problem:',
+            options: Array.isArray(dbQ.options) ? dbQ.options.map(opt => ({ text: opt })) : [{ text: String(dbQ.correctAnswer) }],
+            correctAnswer: String(dbQ.correctAnswer),
             difficulty: diffKey
           }
-          servedIdsRef.current.add(String(dbQ.id))
-          const queue = cacheRef.current.get(diffKey) || []
-          queue.push(formattedQ)
-          cacheRef.current.set(diffKey, queue)
+          if (isValidQuestion(formattedQ)) {
+            // Do NOT mark served here; only mark served when actually popped & displayed
+            const queue = cacheRef.current.get(diffKey) || []
+            queue.push(formattedQ)
+            cacheRef.current.set(diffKey, queue)
+          }
         }
       }
     } catch (_err) {
@@ -92,20 +113,38 @@ export function usePrefetchCache() {
     let selectedQ = null
     let wasCacheHit = false
 
-    if (queue.length > 0) {
-      selectedQ = queue.shift()
-      wasCacheHit = true
-    } else {
+    // Pop first valid question from queue
+    while (queue.length > 0 && !selectedQ) {
+      const candidate = queue.shift()
+      if (isValidQuestion(candidate)) {
+        selectedQ = candidate
+        wasCacheHit = true
+      } else {
+        console.warn('[Assessment Cache] Discarded invalid question from queue:', candidate)
+      }
+    }
+
+    // Fallback if cache empty or invalid
+    if (!selectedQ) {
       selectedQ = generateAdaptiveQuestionFallback(diff, questionIndex)
+      wasCacheHit = false
+    }
+
+    // Final safety guard: ensure selectedQ is 100% valid
+    if (!isValidQuestion(selectedQ)) {
+      console.error('[Assessment Cache] Produced invalid question object, generating safe arithmetic fallback:', selectedQ)
+      selectedQ = generateArithmetic(diff, questionIndex)
       wasCacheHit = false
     }
 
     markIdServed(selectedQ)
 
-    // Fire background prefetch asynchronously to refill cache
-    setTimeout(() => {
-      prefetchAdjacent(diff)
-    }, 0)
+    // Fire background prefetch asynchronously only if more questions are needed
+    if (questionIndex < 7) {
+      setTimeout(() => {
+        prefetchAdjacent(diff)
+      }, 0)
+    }
 
     return { question: selectedQ, wasCacheHit }
   }, [prefetchAdjacent])

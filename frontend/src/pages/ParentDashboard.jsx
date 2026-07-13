@@ -314,6 +314,11 @@ export default function ParentDashboard() {
                           </span>
                         </div>
                         <span className="text-xs text-gray-500 block mt-1">Grade {child.grade} · Age {child.age}</span>
+                        {child.studentCode && (
+                          <span className="inline-block mt-1.5 px-2.5 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-lg text-[10px] font-mono font-bold">
+                            ID: {child.studentCode}
+                          </span>
+                        )}
                       </div>
                       
                       <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-gray-100 text-xs">
@@ -345,17 +350,17 @@ export default function ParentDashboard() {
           <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-xs space-y-4 h-fit">
             <h3 className="text-base font-bold text-black">Link Child Profile</h3>
             <p className="text-xs text-gray-500">
-              Enter the unique Child ID (External User ID) provided by your child's student profile page.
+              Enter the unique Student ID Code (e.g. NB-X8K9M2) from your child&apos;s passport card.
             </p>
             
             <form onSubmit={handleLinkChild} className="space-y-3">
               <div>
                 <input
                   type="text"
-                  placeholder="e.g. user_12345"
+                  placeholder="e.g. NB-X8K9M2"
                   value={childExternalId}
                   onChange={(e) => setChildExternalId(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-xl text-sm"
+                  className="w-full px-3 py-2 border rounded-xl text-sm font-mono uppercase"
                 />
               </div>
               

@@ -4,6 +4,7 @@ import springClient from '../api/springClient'
 import { getUser } from '../auth'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorBanner from '../components/ErrorBanner'
+import StudentIdCard from '../components/StudentIdCard'
 import {
   ResponsiveContainer,
   LineChart,
@@ -130,6 +131,9 @@ export default function ProgressDashboard() {
         </div>
 
         {error && <ErrorBanner message={error} onClose={() => setError('')} />}
+
+        {/* Unique Student Passport ID Card with Copy Button & QR Badge */}
+        <StudentIdCard student={getUser()} />
 
         {data && (
           <>

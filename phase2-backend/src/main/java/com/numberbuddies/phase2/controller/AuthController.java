@@ -72,6 +72,7 @@ public class AuthController {
         response.setEmail(user.getEmail());
         response.setRole(user.getRole());
         response.setToken(token);
+        response.setStudentCode(user.getStudentCode());
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -93,6 +94,7 @@ public class AuthController {
         response.setEmail(user.getEmail());
         response.setRole(user.getRole());
         response.setToken(token);
+        response.setStudentCode(user.getStudentCode());
 
         return ResponseEntity.ok(response);
     }

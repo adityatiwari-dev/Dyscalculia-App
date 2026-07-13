@@ -13,6 +13,33 @@ public class ChildSummaryResponse {
     private String strongestTopic;
     private String weakestTopic;
     private String aiRiskLevel;
+    private String studentCode;
+    private String className;
+    private String sectionName;
+
+    public String getStudentCode() {
+        return studentCode;
+    }
+
+    public void setStudentCode(String studentCode) {
+        this.studentCode = studentCode;
+    }
+
+    public String getClassName() {
+        return className;
+    }
+
+    public void setClassName(String className) {
+        this.className = className;
+    }
+
+    public String getSectionName() {
+        return sectionName;
+    }
+
+    public void setSectionName(String sectionName) {
+        this.sectionName = sectionName;
+    }
 
     public String getExternalUserId() {
         return externalUserId;

@@ -26,10 +26,11 @@ const OptionButton = React.memo(function OptionButton({ optText, onSelect, disab
 })
 
 export default function Assessment() {
+  // Single source of truth for session state (no duplicate state variables)
+  const [questions, setQuestions] = useState([])
   const [questionIndex, setQuestionIndex] = useState(0)
   const [answers, setAnswers] = useState([])
-  const [questions, setQuestions] = useState([])
-  const [current, setCurrent] = useState(null)
+
   const [secondsLeft, setSecondsLeft] = useState(TIMER_SECONDS)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -39,6 +40,7 @@ export default function Assessment() {
   const [checkingProgress, setCheckingProgress] = useState(true)
   const [audioEnabled, setAudioEnabled] = useState(true)
 
+  const stateRef = useRef({ questions: [], questionIndex: 0, answers: [] })
   const restoredSecondsLeftRef = useRef(null)
   const timerRef = useRef(null)
   const startTsRef = useRef(Date.now())
@@ -49,12 +51,39 @@ export default function Assessment() {
   const { popQuestionSync, prefetchAdjacent, registerExistingQuestions } = usePrefetchCache()
   const { triggerAutosave, getLocalStorageBackup, clearSession } = useAssessmentAutosave(user)
 
-  /* ================= INIT & SESSION RESUME ================= */
+  // Derived current question guaranteed to always be in sync with questions[questionIndex]
+  const current = questions[questionIndex] || null
+
   useEffect(() => {
+    stateRef.current = { questions, questionIndex, answers }
+  }, [questions, questionIndex, answers])
+
+  /* ================= INIT & SESSION RESUME ================= */
+  const startFresh = useCallback(() => {
+    const { question: firstQ } = popQuestionSync(2, 0)
+    if (!firstQ || firstQ.correctAnswer === undefined || firstQ.correctAnswer === null) {
+      console.error('[Assessment] popQuestionSync produced invalid first question!', firstQ)
+      return
+    }
+    const initQuestions = [firstQ]
+    setQuestions(initQuestions)
+    setQuestionIndex(0)
+    setAnswers([])
+    stateRef.current = { questions: initQuestions, questionIndex: 0, answers: [] }
+    startTsRef.current = Date.now()
+
+    prefetchAdjacent(2)
+  }, [popQuestionSync, prefetchAdjacent])
+
+  const hasInitializedRef = useRef(false)
+
+  useEffect(() => {
+    if (hasInitializedRef.current) return
+    hasInitializedRef.current = true
+
     perfLogger.reset()
 
     const checkSavedSession = async () => {
-      // First check local backup for rapid offline resume resilience
       const localBackup = getLocalStorageBackup()
 
       if (!user?._id) {
@@ -75,7 +104,7 @@ export default function Assessment() {
         })
         perfLogger.logApiFetch('GET /api/v2/assessments/progress', performance.now() - fetchStart, true)
 
-        if (res.status === 200 && res.data) {
+        if (res.status === 200 && res.data && Array.isArray(res.data.questions) && res.data.questions.length > 0) {
           setSavedProgress(res.data)
           setShowResumeModal(true)
         } else if (localBackup && Array.isArray(localBackup.questions) && localBackup.questions.length > 0) {
@@ -84,7 +113,7 @@ export default function Assessment() {
         } else {
           startFresh()
         }
-      } catch (err) {
+      } catch (_err) {
         perfLogger.logApiFetch('GET /api/v2/assessments/progress', 0, false)
         if (localBackup && Array.isArray(localBackup.questions) && localBackup.questions.length > 0) {
           setSavedProgress(localBackup)
@@ -104,38 +133,27 @@ export default function Assessment() {
     }
   }, [])
 
-  const startFresh = useCallback(() => {
-    // Instant synchronous initial question from cache or fallback
-    const { question: firstQ } = popQuestionSync(2, 0)
-    setQuestions([firstQ])
-    setCurrent(firstQ)
-    setQuestionIndex(0)
-    setAnswers([])
-    startTsRef.current = Date.now()
-
-    // Trigger background prefetch for upcoming difficulties
-    prefetchAdjacent(2)
-  }, [popQuestionSync, prefetchAdjacent])
-
   const handleResume = useCallback(() => {
     if (!savedProgress) return
 
     registerExistingQuestions(savedProgress.questions)
-    setQuestions(savedProgress.questions)
-    setAnswers(savedProgress.answers || [])
+    const resumedQuestions = savedProgress.questions
+    const resumedAnswers = savedProgress.answers || []
     const resumeIdx = savedProgress.currentQuestionIndex || 0
+
+    setQuestions(resumedQuestions)
+    setAnswers(resumedAnswers)
     setQuestionIndex(resumeIdx)
+    stateRef.current = { questions: resumedQuestions, questionIndex: resumeIdx, answers: resumedAnswers }
 
     if (savedProgress.secondsLeft !== undefined && savedProgress.secondsLeft !== null) {
       restoredSecondsLeftRef.current = savedProgress.secondsLeft
     }
 
-    const resumedQ = savedProgress.questions[resumeIdx] || savedProgress.questions[0]
-    setCurrent(resumedQ)
     setShowResumeModal(false)
     startTsRef.current = Date.now()
 
-    // Replenish prefetch cache around resumed difficulty
+    const resumedQ = resumedQuestions[resumeIdx] || resumedQuestions[0]
     prefetchAdjacent(resumedQ?.difficulty || 2)
   }, [savedProgress, registerExistingQuestions, prefetchAdjacent])
 
@@ -168,7 +186,99 @@ export default function Assessment() {
     }
   }, [current, speakText])
 
-  /* ================= 1-SECOND TIMER & AUTOSAVE ================= */
+  /* ================= FINAL SUBMISSION ================= */
+  const submitAssessment = useCallback(async (finalAnswers, finalQuestions) => {
+    if (submitting) return
+    setSubmitting(true)
+
+    try {
+      perfLogger.printReport()
+
+      const legacyId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36)
+
+      const synced = await syncAssessmentToPhase2({
+        assessmentType: 'FULL',
+        legacyAssessmentId: legacyId,
+        questions: finalQuestions,
+        answers: finalAnswers,
+      })
+
+      if (!synced) {
+        throw new Error('Assessment submission failed. Is the Spring Boot backend running?')
+      }
+
+      await clearSession()
+      navigate('/results', { replace: true })
+    } catch (err) {
+      setError(err.message || 'Failed to submit assessment')
+    } finally {
+      setSubmitting(false)
+    }
+  }, [clearSession, navigate, submitting])
+
+  /* ================= OPTION SELECT / QUESTION TRANSITION (<10ms) ================= */
+  const handleSelect = useCallback((opt, responseTime) => {
+    const { questions: currQuestions, questionIndex: currIdx, answers: currAnswers } = stateRef.current
+    const currQ = currQuestions[currIdx]
+
+    if (!currQ || currQ.correctAnswer === undefined || currQ.correctAnswer === null) {
+      console.error('[Assessment] handleSelect encountered null/invalid current question. Aborting.')
+      return
+    }
+
+    const transitionStartTime = performance.now()
+    const updatedAnswers = [...currAnswers, { selected: opt, responseTime }]
+
+    if (currIdx < TOTAL_QUESTIONS - 1) {
+      const wasCorrect = opt !== null && String(opt) === String(currQ.correctAnswer)
+      const quick = responseTime < 5000
+
+      const nextDifficulty = Math.min(
+        5,
+        Math.max(
+          1,
+          (currQ.difficulty || 2) +
+            (wasCorrect && quick ? 1 : 0) -
+            (!wasCorrect ? 1 : 0)
+        )
+      )
+
+      const nextIdx = currIdx + 1
+      const { question: nextQ, wasCacheHit } = popQuestionSync(nextDifficulty, nextIdx)
+
+      if (!nextQ || nextQ.correctAnswer === undefined || nextQ.correctAnswer === null) {
+        console.error('[Assessment] popQuestionSync returned invalid nextQ at index', nextIdx)
+        return
+      }
+
+      const transitionTimeMs = performance.now() - transitionStartTime
+      perfLogger.logTransition(transitionTimeMs, wasCacheHit, nextDifficulty)
+
+      const updatedQuestions = [...currQuestions, nextQ]
+
+      // Synchronize both state and ref in the same tick
+      setAnswers(updatedAnswers)
+      setQuestions(updatedQuestions)
+      setQuestionIndex(nextIdx)
+      stateRef.current = { questions: updatedQuestions, questionIndex: nextIdx, answers: updatedAnswers }
+
+      startTsRef.current = Date.now()
+      setSecondsLeft(TIMER_SECONDS)
+
+      triggerAutosave(nextIdx, updatedQuestions, updatedAnswers, TIMER_SECONDS)
+    } else {
+      setAnswers(updatedAnswers)
+      stateRef.current = { questions: currQuestions, questionIndex: currIdx, answers: updatedAnswers }
+      submitAssessment(updatedAnswers, currQuestions)
+    }
+  }, [popQuestionSync, submitAssessment, triggerAutosave])
+
+  /* ================= 1-SECOND TIMER ================= */
+  const handleSelectRef = useRef(handleSelect)
+  useEffect(() => {
+    handleSelectRef.current = handleSelect
+  }, [handleSelect])
+
   useEffect(() => {
     if (!current) return
 
@@ -185,7 +295,11 @@ export default function Assessment() {
       setSecondsLeft((s) => {
         if (s <= 1) {
           clearInterval(timerRef.current)
-          setTimeout(() => handleTimeout(), 0)
+          setTimeout(() => {
+            if (handleSelectRef.current) {
+              handleSelectRef.current(null, TIMER_SECONDS * 1000)
+            }
+          }, 0)
           return 0
         }
         return s - 1
@@ -195,89 +309,13 @@ export default function Assessment() {
     return () => clearInterval(timerRef.current)
   }, [current])
 
-  /* ================= OPTION SELECT / QUESTION TRANSITION (<10ms) ================= */
-  const handleTimeout = useCallback(() => {
-    handleSelect(null, TIMER_SECONDS * 1000)
-  }, [])
-
   const select = useCallback((opt) => {
     if (submitting) return
     const responseTime = Date.now() - startTsRef.current
     handleSelect(opt, responseTime)
-  }, [submitting])
+  }, [handleSelect, submitting])
 
-  const handleSelect = useCallback((opt, responseTime) => {
-    const transitionStartTime = performance.now()
-
-    const updatedAnswers = [...answers, { selected: opt, responseTime }]
-    setAnswers(updatedAnswers)
-
-    if (questionIndex < TOTAL_QUESTIONS - 1) {
-      const wasCorrect = opt !== null && String(opt) === String(current.correctAnswer)
-      const quick = responseTime < 5000
-
-      const nextDifficulty = Math.min(
-        5,
-        Math.max(
-          1,
-          (current.difficulty || 2) +
-            (wasCorrect && quick ? 1 : 0) -
-            (!wasCorrect ? 1 : 0)
-        )
-      )
-
-      // INSTANTANEOUS SYNCHRONOUS TRANSITION (<1ms) FROM PREFETCH CACHE / FALLBACK
-      const nextIdx = questionIndex + 1
-      const { question: nextQ, wasCacheHit } = popQuestionSync(nextDifficulty, nextIdx)
-
-      const transitionTimeMs = performance.now() - transitionStartTime
-      perfLogger.logTransition(transitionTimeMs, wasCacheHit, nextDifficulty)
-
-      const updatedQuestions = [...questions, nextQ]
-      setQuestions(updatedQuestions)
-      setCurrent(nextQ)
-      setQuestionIndex(nextIdx)
-      startTsRef.current = Date.now()
-
-      // Fire-and-forget asynchronous autosave (every 3 questions or periodic)
-      triggerAutosave(nextIdx, updatedQuestions, updatedAnswers, TIMER_SECONDS)
-    } else {
-      // Complete assessment - submit final answers
-      submitAssessment(updatedAnswers)
-    }
-  }, [answers, current, popQuestionSync, questionIndex, questions, triggerAutosave])
-
-  /* ================= FINAL SUBMISSION ================= */
-  const submitAssessment = async (finalAnswers) => {
-    if (submitting) return
-    setSubmitting(true)
-
-    try {
-      perfLogger.printReport()
-
-      const legacyId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36)
-
-      const synced = await syncAssessmentToPhase2({
-        assessmentType: 'FULL',
-        legacyAssessmentId: legacyId,
-        questions,
-        answers: finalAnswers,
-      })
-
-      if (!synced) {
-        throw new Error('Assessment submission failed. Is the Spring Boot backend running?')
-      }
-
-      await clearSession()
-      navigate('/results', { replace: true })
-    } catch (err) {
-      setError(err.message || 'Failed to submit assessment')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  if (checkingProgress) {
+  if (checkingProgress || !current) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
         <LoadingSpinner size={48} />
@@ -311,9 +349,9 @@ export default function Assessment() {
         {error && <ErrorBanner message={error} />}
 
         <div className="mb-3 text-lg font-medium text-black flex items-center gap-2">
-          <span>{current?.questionText}</span>
+          <span>{current.questionText}</span>
           <button
-            onClick={() => speakText(current?.questionText)}
+            onClick={() => speakText(current.questionText)}
             className="p-1 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-black transition"
             title="Read Question Aloud"
           >
@@ -322,10 +360,10 @@ export default function Assessment() {
         </div>
 
         <div className="text-sm mb-4 text-black">
-          Difficulty: {current?.difficulty} | ⏱ {secondsLeft}s
+          Difficulty: {current.difficulty} | ⏱ {secondsLeft}s
         </div>
 
-        {current?.dots && (
+        {current.dots && (
           <div className="flex gap-2 flex-wrap mb-4">
             {Array.from({ length: current.dots }).map((_, i) => (
               <div key={i} className="w-5 h-5 bg-blue-500 rounded-full" />
@@ -333,7 +371,7 @@ export default function Assessment() {
           </div>
         )}
 
-        {current?.shapes && (
+        {current.shapes && (
           <div className="flex gap-4 mb-4">
             {current.shapes.map((s, i) => (
               <div key={i} className={`w-12 h-12 ${s.color} ${s.shape}`} />
@@ -341,7 +379,7 @@ export default function Assessment() {
           </div>
         )}
 
-        {current?.image && (
+        {current.image && (
           <img
             src={current.image}
             alt="question"
@@ -353,7 +391,7 @@ export default function Assessment() {
         )}
 
         <div className="grid grid-cols-2 gap-3">
-          {(current?.options || []).map((opt, i) => (
+          {(current.options || []).map((opt, i) => (
             <OptionButton
               key={i}
               optText={opt.text}

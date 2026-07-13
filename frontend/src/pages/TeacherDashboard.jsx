@@ -47,6 +47,8 @@ export default function TeacherDashboard() {
   
   // Link Student form state
   const [studentExternalId, setStudentExternalId] = useState('')
+  const [linkClass, setLinkClass] = useState('')
+  const [linkSection, setLinkSection] = useState('')
   const [linkSuccess, setLinkSuccess] = useState('')
   const [linkError, setLinkError] = useState('')
   
@@ -62,6 +64,8 @@ export default function TeacherDashboard() {
 
   // Student Observations state
   const [observations, setObservations] = useState([])
+  const [newObservationText, setNewObservationText] = useState('')
+  const [submittingNote, setSubmittingNote] = useState(false)
 
   const teacher = getUser()
 
@@ -102,10 +106,15 @@ export default function TeacherDashboard() {
     try {
       await springClient.post('/api/v2/teacher/link-student', {
         teacherExternalUserId: teacher._id,
-        studentExternalUserId: studentExternalId.trim()
+        studentExternalUserId: studentExternalId.trim(),
+        studentCode: studentExternalId.trim(),
+        className: linkClass.trim() || null,
+        sectionName: linkSection.trim() || null
       })
       setLinkSuccess(`Successfully linked student: ${studentExternalId}`)
       setStudentExternalId('')
+      setLinkClass('')
+      setLinkSection('')
       fetchStudents() // refresh list
     } catch (err) {
       setLinkError(
@@ -303,6 +312,23 @@ export default function TeacherDashboard() {
                           </span>
                         </div>
                         <span className="text-xs text-gray-500 block mt-1">Grade {student.grade} · Age {student.age}</span>
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {student.studentCode && (
+                            <span className="px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-lg text-[10px] font-mono font-bold">
+                              ID: {student.studentCode}
+                            </span>
+                          )}
+                          {student.className && (
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-[10px] font-bold">
+                              Class: {student.className}
+                            </span>
+                          )}
+                          {student.sectionName && (
+                            <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-[10px] font-bold">
+                              Section: {student.sectionName}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       
                       <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-gray-100 text-xs">
@@ -334,18 +360,42 @@ export default function TeacherDashboard() {
           <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-xs space-y-4 h-fit">
             <h3 className="text-base font-bold text-black">Link Student</h3>
             <p className="text-xs text-gray-500">
-              Enter the unique Student ID (External User ID) from the student's profile.
+              Enter the unique Student ID Code (e.g. NB-X8K9M2) to link and assign a class.
             </p>
             
             <form onSubmit={handleLinkStudent} className="space-y-3">
               <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Student ID Code *</label>
                 <input
                   type="text"
-                  placeholder="e.g. user_abc123"
+                  placeholder="e.g. NB-X8K9M2"
                   value={studentExternalId}
                   onChange={(e) => setStudentExternalId(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-xl text-sm"
+                  className="w-full px-3 py-2 border rounded-xl text-sm font-mono uppercase"
+                  required
                 />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Class / Grade</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Math 3"
+                    value={linkClass}
+                    onChange={(e) => setLinkClass(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-xl text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Section</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Sec A"
+                    value={linkSection}
+                    onChange={(e) => setSectionName ? setLinkSection(e.target.value) : setLinkSection(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-xl text-xs"
+                  />
+                </div>
               </div>
               
               {linkError && <p className="text-xs text-red-500">{linkError}</p>}

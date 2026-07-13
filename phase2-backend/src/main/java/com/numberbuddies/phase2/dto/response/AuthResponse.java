@@ -11,6 +11,15 @@ public class AuthResponse {
     private String email;
     private String role;
     private String token;
+    private String studentCode;
+
+    public String getStudentCode() {
+        return studentCode;
+    }
+
+    public void setStudentCode(String studentCode) {
+        this.studentCode = studentCode;
+    }
 
     public String getId() {
         return id;

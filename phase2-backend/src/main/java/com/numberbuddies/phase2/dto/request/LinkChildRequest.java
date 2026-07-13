@@ -7,8 +7,9 @@ public class LinkChildRequest {
     @NotBlank(message = "Parent external user ID is required")
     private String parentExternalUserId;
 
-    @NotBlank(message = "Child external user ID is required")
     private String childExternalUserId;
+
+    private String studentCode;
 
     public String getParentExternalUserId() {
         return parentExternalUserId;
@@ -24,5 +25,13 @@ public class LinkChildRequest {
 
     public void setChildExternalUserId(String childExternalUserId) {
         this.childExternalUserId = childExternalUserId;
+    }
+
+    public String getStudentCode() {
+        return studentCode;
+    }
+
+    public void setStudentCode(String studentCode) {
+        this.studentCode = studentCode;
     }
 }

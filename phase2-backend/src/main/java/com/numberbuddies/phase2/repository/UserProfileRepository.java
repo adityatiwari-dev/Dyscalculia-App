@@ -16,4 +16,7 @@ public interface UserProfileRepository extends JpaRepository<UserProfile, UUID> 
     List<UserProfile> findByTeacher_ExternalUserId(String teacherExternalUserId);
 
     Optional<UserProfile> findByEmail(String email);
+
+    Optional<UserProfile> findByStudentCode(String studentCode);
 }
+
