@@ -41,10 +41,17 @@ export default function Navbar() {
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex gap-4">
-          {user?.role === 'parent' ? (
+        <nav className="hidden md:flex gap-4 items-center">
+          {user?.role === 'parent' && (
             <Link to="/parent-dashboard" className="hover:text-primary font-bold">Parent Dashboard</Link>
-          ) : (
+          )}
+          {user?.role === 'teacher' && (
+            <Link to="/teacher-dashboard" className="hover:text-primary font-bold">Teacher Dashboard</Link>
+          )}
+          {user?.role === 'admin' && (
+            <Link to="/admin" className="hover:text-primary font-bold">Admin Panel</Link>
+          )}
+          {(!user || (user.role !== 'parent' && user.role !== 'teacher' && user.role !== 'admin')) && (
             <>
               <Link to="/assessment" className="hover:text-primary">Assessment</Link>
               <Link to="/screening" className="hover:text-primary">Screening</Link>
@@ -54,6 +61,7 @@ export default function Navbar() {
               <Link to="/progress" className="hover:text-primary">Progress</Link>
             </>
           )}
+          <Link to="/about" className="hover:text-primary font-medium text-xs bg-gray-100 px-3 py-1.5 rounded-xl border">About Dyscalculia</Link>
         </nav>
 
         {/* Desktop Auth */}
@@ -122,7 +130,7 @@ export default function Navbar() {
               {/* Drawer Navigation */}
           
 <nav className="flex-1 space-y-3">
-  {user?.role === 'parent' ? (
+  {user?.role === 'parent' && (
     <Link
       onClick={() => setOpen(false)}
       to="/parent-dashboard"
@@ -132,7 +140,30 @@ export default function Navbar() {
       <span className="text-xl">📈</span>
       <span className="font-bold">Parent Dashboard</span>
     </Link>
-  ) : (
+  )}
+  {user?.role === 'teacher' && (
+    <Link
+      onClick={() => setOpen(false)}
+      to="/teacher-dashboard"
+      className="flex items-center gap-3 px-4 py-4 rounded-xl
+                 bg-primary/10 border-2 border-primary text-black transition"
+    >
+      <span className="text-xl">🎓</span>
+      <span className="font-bold">Teacher Dashboard</span>
+    </Link>
+  )}
+  {user?.role === 'admin' && (
+    <Link
+      onClick={() => setOpen(false)}
+      to="/admin"
+      className="flex items-center gap-3 px-4 py-4 rounded-xl
+                 bg-primary/10 border-2 border-primary text-black transition"
+    >
+      <span className="text-xl">🛠️</span>
+      <span className="font-bold">Admin Panel</span>
+    </Link>
+  )}
+  {(!user || (user.role !== 'parent' && user.role !== 'teacher' && user.role !== 'admin')) && (
     <>
       <Link
         onClick={() => setOpen(false)}
@@ -201,6 +232,16 @@ export default function Navbar() {
       </Link>
     </>
   )}
+  <Link
+    onClick={() => setOpen(false)}
+    to="/about"
+    className="flex items-center gap-3 px-4 py-4 rounded-xl
+               bg-gray-50 border hover:bg-gray-100 transition
+               text-gray-900 hover:text-black font-semibold"
+  >
+    <span className="text-xl">📚</span>
+    <span>About Dyscalculia</span>
+  </Link>
 </nav>
 
 

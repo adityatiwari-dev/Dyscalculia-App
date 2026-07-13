@@ -10,6 +10,9 @@ import AiReport from './pages/AiReport'
 import Practice from './pages/Practice'
 import ProgressDashboard from './pages/ProgressDashboard'
 import ParentDashboard from './pages/ParentDashboard'
+import TeacherDashboard from './pages/TeacherDashboard'
+import AdminPanel from './pages/AdminPanel'
+import AboutDyscalculia from './pages/AboutDyscalculia'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -47,9 +50,12 @@ function App() {
             <Route path="/history" element={<ProtectedRoute><AssessmentHistory /></ProtectedRoute>} />
             <Route path="/progress" element={<ProtectedRoute><ProgressDashboard /></ProtectedRoute>} />
             <Route path="/parent-dashboard" element={<ProtectedRoute><ParentDashboard /></ProtectedRoute>} />
+            <Route path="/teacher-dashboard" element={<ProtectedRoute><TeacherDashboard /></ProtectedRoute>} />
+            <Route path="/admin" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
             <Route path="/ai-report/:assessmentId" element={<ProtectedRoute><AiReport /></ProtectedRoute>} />
             <Route path="/activities" element={<ProtectedRoute><Activities /></ProtectedRoute>} />
             <Route path="/practice" element={<ProtectedRoute><Practice /></ProtectedRoute>} />
+            <Route path="/about" element={<AboutDyscalculia />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
           </Routes>

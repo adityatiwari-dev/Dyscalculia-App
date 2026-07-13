@@ -59,6 +59,11 @@ export default function ParentDashboard() {
   const [reportLoading, setReportLoading] = useState(false)
   const [reportError, setReportError] = useState('')
 
+  // Parent Observations states
+  const [observations, setObservations] = useState([])
+  const [newObservationText, setNewObservationText] = useState('')
+  const [submittingNote, setSubmittingNote] = useState(false)
+
   const parent = getUser()
 
   const fetchChildren = async () => {
@@ -115,6 +120,7 @@ export default function ParentDashboard() {
     setSelectedChild(child)
     setChildDashboard(null)
     setChildHistory([])
+    setObservations([])
     setSelectedReport(null)
     setDetailLoading(true)
 
@@ -133,10 +139,36 @@ export default function ParentDashboard() {
         params: { externalUserId: child.externalUserId }
       })
       setChildHistory(histRes.data)
+
+      // 3. Fetch observations
+      const obsRes = await springClient.get('/api/v2/observations', {
+        params: { studentExternalUserId: child.externalUserId }
+      })
+      setObservations(obsRes.data)
     } catch (err) {
       console.warn("Error fetching child details:", err)
     } finally {
       setDetailLoading(false)
+    }
+  }
+
+  const handleSaveObservation = async (e) => {
+    e.preventDefault()
+    if (!newObservationText.trim()) return
+
+    setSubmittingNote(true)
+    try {
+      const res = await springClient.post('/api/v2/observations', {
+        studentExternalUserId: selectedChild.externalUserId,
+        parentExternalUserId: parent._id,
+        observationText: newObservationText.trim()
+      })
+      setObservations(prev => [res.data, ...prev])
+      setNewObservationText('')
+    } catch (err) {
+      console.error("Failed to save observation note:", err)
+    } finally {
+      setSubmittingNote(false)
     }
   }
 
@@ -177,6 +209,27 @@ export default function ParentDashboard() {
     } catch (err) {
       console.error("PDF download failed:", err)
       alert("Unable to download report. Please check if the backend is running.")
+    }
+  }
+
+  const handleDownloadCsv = async (studentExternalUserId, studentName) => {
+    try {
+      const res = await springClient.get('/api/v2/progress/export/csv', {
+        params: { studentExternalUserId },
+        responseType: 'blob'
+      })
+      const blob = new Blob([res.data], { type: 'text/csv' })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `assessment_report_${studentName.toLowerCase().replace(/\s+/g, '_')}.csv`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error("CSV export failed:", err)
+      alert("Failed to export assessment records as CSV.")
     }
   }
 
@@ -438,7 +491,15 @@ export default function ParentDashboard() {
 
                 {/* Child Assessment History Section */}
                 <div className="bg-white p-6 rounded-2xl shadow-xs border border-gray-100 space-y-4">
-                  <h4 className="text-lg font-bold text-black">Assessment History & AI Reports</h4>
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-lg font-bold text-black">Assessment History & AI Reports</h4>
+                    <button
+                      onClick={() => handleDownloadCsv(selectedChild.externalUserId, selectedChild.name)}
+                      className="px-3 py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 transition"
+                    >
+                      📊 Export to CSV
+                    </button>
+                  </div>
                   {childHistory.length === 0 ? (
                     <p className="text-sm text-gray-500">No assessments synced yet.</p>
                   ) : (
@@ -474,6 +535,49 @@ export default function ParentDashboard() {
                       </table>
                     </div>
                   )}
+                </div>
+
+                {/* Parent Observations Section */}
+                <div className="bg-white p-6 rounded-2xl shadow-xs border border-gray-100 space-y-4">
+                  <h4 className="text-lg font-bold text-black">Behavior & Progress Observations</h4>
+                  
+                  <form onSubmit={handleSaveObservation} className="space-y-3">
+                    <textarea
+                      value={newObservationText}
+                      onChange={(e) => setNewObservationText(e.target.value)}
+                      placeholder="Add observations about your child's daily interactions with numbers, struggles, or positive breakthroughs..."
+                      rows={3}
+                      className="w-full p-3 border border-gray-200 rounded-xl text-xs text-black focus:ring-1 focus:ring-primary focus:outline-none"
+                    />
+                    <div className="flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={submittingNote || !newObservationText.trim()}
+                        className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-bold transition disabled:opacity-50"
+                      >
+                        {submittingNote ? 'Saving...' : 'Add Observation Note'}
+                      </button>
+                    </div>
+                  </form>
+
+                  <div className="space-y-3 pt-2">
+                    <h5 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Logged Notes</h5>
+                    {observations.length === 0 ? (
+                      <p className="text-xs text-gray-400 italic">No notes logged yet.</p>
+                    ) : (
+                      <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                        {observations.map(obs => (
+                          <div key={obs.id} className="p-3 bg-gray-50 rounded-xl border border-gray-100 text-xs">
+                            <p className="text-black leading-relaxed">{obs.observationText}</p>
+                            <div className="flex justify-between items-center text-[10px] text-gray-400 mt-2 font-medium">
+                              <span>By {obs.parentName}</span>
+                              <span>{formatDate(obs.createdAt)}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
               </div>

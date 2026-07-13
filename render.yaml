@@ -25,9 +25,9 @@ services:
       - key: JWT_SECRET
         value: dGhpcy1pcy1hLXNlY3VyZS1zZWNyZXQta2V5LWYyLWRpc2NhbGN1bGlhLWFwcC1iYWNrZW5k
 
-      # CORS Origin (Points to Vercel production frontend)
+      # CORS Origin (Points to Vercel production frontend and preview deployments)
       - key: CORS_ORIGINS
-        value: https://frontend-phi-five-61.vercel.app
+        value: https://frontend-phi-five-61.vercel.app,https://*.vercel.app,http://localhost:5174,http://localhost:3000
 
       # AI Module Toggle
       - key: AI_ENABLED

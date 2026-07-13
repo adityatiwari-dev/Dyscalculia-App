@@ -33,32 +33,75 @@ export default function Screening(){
     memory: { label: 'Memory', time: 10, generator: genMemory }
   }
 
-  function startDomain(d){
+  const loadNextQuestion = async (domain, difficulty, idx, subtype) => {
+    try {
+      let topicStr = 'NUMBER_SENSE'
+      if (domain === 'arithmetic') topicStr = 'ADDITION'
+      else if (domain === 'spatial') topicStr = 'PLACE_VALUE'
+      else if (domain === 'memory') topicStr = 'PATTERN_RECOGNITION'
+
+      const shownIds = questions.filter(q => q.id).map(q => q.id).join(',')
+      const res = await client.get('/api/v2/questions/adaptive', {
+        params: {
+          difficultyLevel: difficulty,
+          topic: topicStr,
+          excludeIds: shownIds
+        }
+      })
+      if (res.status === 204 || !res.data) {
+        console.info("All DB questions exhausted for this session. Using local generator fallback.")
+        return domainConfigs[domain].generator(difficulty, idx, subtype)
+      }
+      const dbQ = res.data
+      return {
+        id: dbQ.id,
+        localId: `q-${idx}`,
+        questionType: dbQ.questionType,
+        questionText: dbQ.questionText,
+        options: dbQ.options.map(opt => ({ text: opt })),
+        correctAnswer: dbQ.correctAnswer,
+        difficulty: difficulty,
+        speechText: dbQ.questionText
+      }
+    } catch (err) {
+      console.warn("Failed to fetch screening question from DB, falling back...", err)
+      return domainConfigs[domain].generator(difficulty, idx, subtype)
+    }
+  }
+
+  async function startDomain(d){
     setDomain(d)
     setSubtype(null)
     setPhase('running')
     setQuestionIndex(0)
-    const q = domainConfigs[d].generator(1, 0)
-    setQuestions([q])
     setAnswers([])
     setSecondsLeft(domainConfigs[d].time)
+    
+    try {
+      const q = await loadNextQuestion(d, 2, 0, null)
+      setQuestions([q])
+    } catch (err) {
+      const fallback = domainConfigs[d].generator(1, 0, null)
+      setQuestions([fallback])
+    }
     startTsRef.current = Date.now()
   }
 
-  function startSubtest(d, subtype){
+  async function startSubtest(d, subtype){
     setDomain(d)
     setSubtype(subtype)
     setPhase('running')
     setQuestionIndex(0)
-    const q = domainConfigs[d].generator(1, 0, subtype)
-    if (!q) {
-      const fallback = { localId: `fallback-${Date.now()}`, questionType: d, questionText: 'Error generating question — try again', options: [{ text: 'OK' }], correctAnswer: null, difficulty: 1 }
-      setQuestions([fallback])
-    } else {
-      setQuestions([q])
-    }
     setAnswers([])
     setSecondsLeft(domainConfigs[d].time)
+
+    try {
+      const q = await loadNextQuestion(d, 2, 0, subtype)
+      setQuestions([q])
+    } catch (err) {
+      const fallback = domainConfigs[d].generator(1, 0, subtype) || { localId: `fallback-${Date.now()}`, questionType: d, questionText: 'Error generating question', options: [{ text: 'OK' }], correctAnswer: null, difficulty: 1 }
+      setQuestions([fallback])
+    }
     startTsRef.current = Date.now()
   }
 
@@ -110,13 +153,27 @@ export default function Screening(){
     selectInternal(opt, rt)
   }
 
-  const selectInternal = (opt, responseTime) => {
+  const selectInternal = async (opt, responseTime) => {
     setAnswers(a => [...a, { questionId: questions[questionIndex].localId, selected: opt, responseTime }])
     const wasCorrect = opt !== null && String(opt) === String(questions[questionIndex].correctAnswer)
     let nextDifficulty = Math.min(5, Math.max(1, questions[questionIndex].difficulty + (wasCorrect ? 1 : -1)))
 
     if(questionIndex < SUBTEST_QUESTIONS - 1){
-      const nextQ = domainConfigs[domain].generator(nextDifficulty, questionIndex+1, subtype)
+      let nextQ
+      try {
+        nextQ = await loadNextQuestion(domain, nextDifficulty, questionIndex+1, subtype)
+      } catch (err) {
+        nextQ = domainConfigs[domain].generator(nextDifficulty, questionIndex+1, subtype)
+      }
+
+      if (!nextQ) {
+        setError("All available questions have been completed! Submitting subtest...")
+        setTimeout(() => {
+          submitSubtest()
+        }, 1500)
+        return
+      }
+
       setQuestions(qs => [...qs, nextQ])
       setQuestionIndex(i => i+1)
       startTsRef.current = Date.now()

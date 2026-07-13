@@ -32,6 +32,7 @@ function formatTopicName(topic) {
 export default function ProgressDashboard() {
   const [data, setData] = useState(null)
   const [periodType, setPeriodType] = useState('weekly')
+  const [achievements, setAchievements] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -52,6 +53,13 @@ export default function ProgressDashboard() {
         }
       })
       setData(res.data)
+
+      // Fetch achievements
+      const achRes = await springClient.get('/api/v2/achievements', {
+        params: { externalUserId: user._id }
+      })
+      setAchievements(achRes.data)
+
       setError('')
     } catch (err) {
       setError(
@@ -306,6 +314,45 @@ export default function ProgressDashboard() {
                 })}
               </div>
             </div>
+
+            {/* Achievements Section */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <h3 className="text-lg font-bold mb-4">Your Badges & Achievements</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {achievements.map(ach => {
+                  return (
+                    <div
+                      key={ach.key}
+                      className={`p-4 rounded-xl border flex flex-col items-center text-center space-y-2 transition ${
+                        ach.earned
+                          ? 'bg-white border-primary/20 shadow-sm'
+                          : 'bg-gray-100/50 border-gray-100 opacity-50'
+                      }`}
+                    >
+                      <span className="text-3xl">{ach.earned ? ach.icon : '🔒'}</span>
+                      <div>
+                        <span className={`font-bold block text-sm ${ach.earned ? 'text-black' : 'text-gray-400'}`}>
+                          {ach.title}
+                        </span>
+                        <span className="text-[10px] text-gray-500 block leading-tight mt-1">
+                          {ach.description}
+                        </span>
+                      </div>
+                      {ach.earned ? (
+                        <span className="text-[8px] font-bold uppercase tracking-wider bg-green-50 text-green-600 border border-green-200 px-2 py-0.5 rounded-full">
+                          Earned
+                        </span>
+                      ) : (
+                        <span className="text-[8px] font-bold uppercase tracking-wider bg-gray-50 text-gray-400 border border-gray-200 px-2 py-0.5 rounded-full">
+                          Locked
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
           </>
         )}
 

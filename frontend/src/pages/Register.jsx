@@ -14,6 +14,7 @@ export default function Register() {
   const [language, setLanguage] = useState('')
   const [educationalBoard, setEducationalBoard] = useState('')
   const [consent, setConsent] = useState(false)
+  const [role, setRole] = useState('student')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -44,6 +45,7 @@ export default function Register() {
         language: language.trim(),
         educationalBoard: educationalBoard.trim(),
         consent,
+        role
       }
 
       const res = await client.post('/api/auth/register', payload)
@@ -102,6 +104,17 @@ export default function Register() {
             className="w-full p-3 rounded-xl border bg-white text-black placeholder-gray-400
                        focus:outline-none focus:ring-2 focus:ring-primary"
           />
+
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            className="w-full p-3 rounded-xl border bg-white text-black focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="student">Student</option>
+            <option value="parent">Parent</option>
+            <option value="teacher">Teacher</option>
+            <option value="admin">Admin</option>
+          </select>
 
           <input
             type="password"
