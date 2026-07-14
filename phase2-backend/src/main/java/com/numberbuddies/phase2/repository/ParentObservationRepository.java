@@ -13,4 +13,6 @@ public interface ParentObservationRepository extends JpaRepository<ParentObserva
     List<ParentObservation> findByStudent_IdOrderByCreatedAtDesc(UUID studentId);
 
     List<ParentObservation> findByStudent_ExternalUserIdOrderByCreatedAtDesc(String studentExternalUserId);
+
+    List<ParentObservation> findByStudent_ExternalUserIdInOrderByCreatedAtDesc(List<String> studentExternalUserIds);
 }

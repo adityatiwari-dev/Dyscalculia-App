@@ -6,6 +6,8 @@ import java.util.UUID;
 public class ObservationResponse {
     private UUID id;
     private String parentName;
+    private String studentName;
+    private String studentExternalUserId;
     private String observationText;
     private OffsetDateTime createdAt;
 
@@ -23,6 +25,22 @@ public class ObservationResponse {
 
     public void setParentName(String parentName) {
         this.parentName = parentName;
+    }
+
+    public String getStudentName() {
+        return studentName;
+    }
+
+    public void setStudentName(String studentName) {
+        this.studentName = studentName;
+    }
+
+    public String getStudentExternalUserId() {
+        return studentExternalUserId;
+    }
+
+    public void setStudentExternalUserId(String studentExternalUserId) {
+        this.studentExternalUserId = studentExternalUserId;
     }
 
     public String getObservationText() {

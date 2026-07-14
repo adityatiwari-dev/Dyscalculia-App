@@ -558,7 +558,7 @@ export default function ParentDashboard() {
                 </div>
 
                 {/* Parent Observations Section */}
-                <div id="recommendations-section" className="bg-white p-6 rounded-2xl shadow-xs border border-gray-100 space-y-4">
+                <div id="observations-section" className="bg-white p-6 rounded-2xl shadow-xs border border-gray-100 space-y-4">
                   <h4 className="text-lg font-bold text-black">Behavior & Progress Observations</h4>
                   
                   <form onSubmit={handleSaveObservation} className="space-y-3">
@@ -598,6 +598,25 @@ export default function ParentDashboard() {
                       </div>
                     )}
                   </div>
+                </div>
+
+                {/* AI Recommendations Section */}
+                <div id="recommendations-section" className="bg-white p-6 rounded-2xl shadow-xs border border-gray-100 space-y-4">
+                  <h4 className="text-lg font-bold text-black">AI Recommendations & Support Strategies</h4>
+                  {childHistory.length === 0 ? (
+                    <p className="text-sm text-gray-500">Complete an assessment to generate AI recommendations for your child.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl space-y-2">
+                        <h5 className="text-xs font-extrabold text-primary uppercase tracking-wider">Home Practice Strategy</h5>
+                        <p className="text-xs text-gray-700">Encourage everyday number activities such as counting objects during daily routines, using visual math toys, and celebrating effort over speed.</p>
+                      </div>
+                      <div className="p-4 bg-green-50 border border-green-200 rounded-xl space-y-2">
+                        <h5 className="text-xs font-extrabold text-green-700 uppercase tracking-wider">Recommended Focus</h5>
+                        <p className="text-xs text-gray-700">Focus on multi-sensory reinforcement and interactive Number Buddies practice quests tailored to {selectedChild.name}'s pace.</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
               </div>

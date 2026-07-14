@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v2/assessments")
+@RequestMapping({"/api/v2/assessments", "/api/v2/assessment"})
 public class AssessmentController {
 
     private final AssessmentHistoryService assessmentHistoryService;

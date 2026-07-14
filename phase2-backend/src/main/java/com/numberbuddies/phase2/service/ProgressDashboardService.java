@@ -53,12 +53,13 @@ public class ProgressDashboardService {
 
     @Transactional(readOnly = true)
     public ProgressDashboardResponse getDashboard(String externalUserId, String periodTypeStr) {
-        UserProfile user = userProfileRepository.findByExternalUserId(externalUserId)
+        String cleanId = externalUserId != null ? externalUserId.trim() : "";
+        UserProfile user = userProfileRepository.findByExternalUserId(cleanId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User profile not found"));
 
         ProgressPeriodType periodType;
         try {
-            periodType = ProgressPeriodType.valueOf(periodTypeStr.toUpperCase());
+            periodType = periodTypeStr != null ? ProgressPeriodType.valueOf(periodTypeStr.trim().toUpperCase()) : ProgressPeriodType.WEEKLY;
         } catch (Exception e) {
             periodType = ProgressPeriodType.WEEKLY; // Default fallback
         }
@@ -90,7 +91,7 @@ public class ProgressDashboardService {
         BigDecimal sumScore = BigDecimal.ZERO;
 
         for (AssessmentRecord record : assessments) {
-            BigDecimal score = record.getTotalScore();
+            BigDecimal score = record.getTotalScore() != null ? record.getTotalScore() : BigDecimal.ZERO;
             if (score.compareTo(maxScore) > 0) maxScore = score;
             if (score.compareTo(minScore) < 0) minScore = score;
             sumScore = sumScore.add(score);

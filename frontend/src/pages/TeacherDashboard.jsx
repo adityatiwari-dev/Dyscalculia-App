@@ -65,8 +65,20 @@ export default function TeacherDashboard() {
 
   // Student Observations state
   const [observations, setObservations] = useState([])
+  const [allParentObservations, setAllParentObservations] = useState([])
+  const [teacherActions, setTeacherActions] = useState({})
   const [newObservationText, setNewObservationText] = useState('')
   const [submittingNote, setSubmittingNote] = useState(false)
+
+  const toggleTeacherAction = (obsId, actionKey) => {
+    setTeacherActions(prev => ({
+      ...prev,
+      [obsId]: {
+        ...prev[obsId],
+        [actionKey]: !prev[obsId]?.[actionKey]
+      }
+    }))
+  }
 
   const teacher = getUser()
 
@@ -84,6 +96,15 @@ export default function TeacherDashboard() {
       })
       setStudents(res.data)
       setError('')
+
+      try {
+        const obsRes = await springClient.get('/api/v2/observations', {
+          params: { teacherExternalUserId: teacher._id }
+        })
+        setAllParentObservations(obsRes.data || [])
+      } catch (obsErr) {
+        console.warn("Could not fetch classroom parent observations:", obsErr)
+      }
     } catch (err) {
       setError(
         err?.response?.data?.message ||
@@ -425,6 +446,98 @@ export default function TeacherDashboard() {
 
         </div>
 
+        {/* Classroom Parent Observations Widget */}
+        <div id="observations-section" className="mt-8 bg-white border border-gray-100 rounded-2xl p-6 shadow-xs space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-extrabold text-black">Parent Observations across Classroom</h3>
+              <p className="text-xs text-gray-500">Notes & observations logged by parents for students assigned to you</p>
+            </div>
+            <span className="text-xs font-bold px-3 py-1 bg-primary/10 text-primary rounded-full">
+              {allParentObservations.length} Observation{allParentObservations.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+
+          {allParentObservations.length === 0 ? (
+            <div className="p-6 text-center bg-gray-50 rounded-xl text-sm text-gray-500">
+              No parent observations recorded yet for your linked students.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {allParentObservations.map(obs => (
+                <div key={obs.id} className="bg-white rounded-2xl border border-gray-200 shadow-xs p-6 space-y-4">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl" role="img" aria-label="family">👨‍👩‍👧</span>
+                      <div>
+                        <h5 className="font-bold text-gray-900 text-base">Parent Observation</h5>
+                        <p className="text-xs text-gray-500">
+                          Parent: <strong className="text-gray-800">{obs.parentName || 'Parent'}</strong>
+                          {obs.studentName && <span> • Student: <strong className="text-primary">{obs.studentName}</strong></span>}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-semibold bg-blue-50 text-blue-700 px-3 py-1 rounded-full flex items-center gap-1 border border-blue-100">
+                      📅 {formatDate(obs.createdAt)}
+                    </span>
+                  </div>
+
+                  <p className="text-sm text-gray-700 leading-relaxed font-medium italic bg-gray-50 p-4 rounded-xl border border-gray-100">
+                    "{obs.observationText}"
+                  </p>
+
+                  <div className="pt-2 border-t border-gray-100">
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-2">Teacher Action</span>
+                    <div className="flex flex-wrap gap-4 text-xs font-semibold text-gray-700">
+                      <label className="flex items-center gap-2 cursor-pointer hover:text-primary transition">
+                        <input
+                          type="checkbox"
+                          checked={teacherActions[obs.id]?.reviewed || false}
+                          onChange={() => toggleTeacherAction(obs.id, 'reviewed')}
+                          className="w-4 h-4 rounded text-primary border-gray-300 focus:ring-primary"
+                        />
+                        <span>Reviewed</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer hover:text-primary transition">
+                        <input
+                          type="checkbox"
+                          checked={teacherActions[obs.id]?.discuss || false}
+                          onChange={() => toggleTeacherAction(obs.id, 'discuss')}
+                          className="w-4 h-4 rounded text-primary border-gray-300 focus:ring-primary"
+                        />
+                        <span>Discuss with Parent</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer hover:text-primary transition">
+                        <input
+                          type="checkbox"
+                          checked={teacherActions[obs.id]?.recommend || false}
+                          onChange={() => toggleTeacherAction(obs.id, 'recommend')}
+                          className="w-4 h-4 rounded text-primary border-gray-300 focus:ring-primary"
+                        />
+                        <span>Add Recommendation</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Teacher Recommendations Widget */}
+        <div id="recommendations-section" className="mt-8 bg-white border border-gray-100 rounded-2xl p-6 shadow-xs space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-extrabold text-black">Teacher Pedagogical Recommendations</h3>
+              <p className="text-xs text-gray-500">Provide tailored learning interventions and classroom support recommendations</p>
+            </div>
+          </div>
+          <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl text-sm text-gray-700 space-y-2">
+            <p className="font-semibold text-primary">💡 Classroom Guidance</p>
+            <p className="text-xs text-gray-600">Select a student below to view their detailed assessment analytics and issue personalized teacher action recommendations.</p>
+          </div>
+        </div>
+
         {/* Selected Student Detail Panel */}
         {selectedStudent && (
           <div id="analytics-section" className="border-t border-gray-200 pt-6 mt-6 space-y-6">
@@ -602,13 +715,45 @@ export default function TeacherDashboard() {
                     {observations.length === 0 ? (
                       <p className="text-sm text-gray-500">No observations logged by parents yet.</p>
                     ) : (
-                      <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+                      <div className="space-y-4 max-h-96 overflow-y-auto pr-1">
                         {observations.map(obs => (
-                          <div key={obs.id} className="p-4 bg-gray-50 border border-gray-100 rounded-xl space-y-2">
-                            <p className="text-sm text-gray-700 leading-relaxed font-medium">"{obs.observationText}"</p>
-                            <div className="flex justify-between items-center text-xs text-gray-400">
-                              <span>By Parent: {obs.parentName}</span>
-                              <span>{formatDate(obs.createdAt)}</span>
+                          <div key={obs.id} className="p-5 bg-white border border-gray-200 rounded-2xl space-y-3 shadow-xs">
+                            <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                              <span className="text-xs font-bold text-gray-800">Parent: {obs.parentName || 'Parent'}</span>
+                              <span className="text-xs text-gray-400">📅 {formatDate(obs.createdAt)}</span>
+                            </div>
+                            <p className="text-sm text-gray-700 leading-relaxed font-medium italic bg-gray-50 p-3 rounded-xl">"{obs.observationText}"</p>
+                            <div className="pt-2 border-t border-gray-100">
+                              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-2">Teacher Action</span>
+                              <div className="flex flex-wrap gap-4 text-xs font-semibold text-gray-700">
+                                <label className="flex items-center gap-2 cursor-pointer hover:text-primary transition">
+                                  <input
+                                    type="checkbox"
+                                    checked={teacherActions[obs.id]?.reviewed || false}
+                                    onChange={() => toggleTeacherAction(obs.id, 'reviewed')}
+                                    className="w-4 h-4 rounded text-primary border-gray-300 focus:ring-primary"
+                                  />
+                                  <span>Reviewed</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer hover:text-primary transition">
+                                  <input
+                                    type="checkbox"
+                                    checked={teacherActions[obs.id]?.discuss || false}
+                                    onChange={() => toggleTeacherAction(obs.id, 'discuss')}
+                                    className="w-4 h-4 rounded text-primary border-gray-300 focus:ring-primary"
+                                  />
+                                  <span>Discuss with Parent</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer hover:text-primary transition">
+                                  <input
+                                    type="checkbox"
+                                    checked={teacherActions[obs.id]?.recommend || false}
+                                    onChange={() => toggleTeacherAction(obs.id, 'recommend')}
+                                    className="w-4 h-4 rounded text-primary border-gray-300 focus:ring-primary"
+                                  />
+                                  <span>Add Recommendation</span>
+                                </label>
+                              </div>
                             </div>
                           </div>
                         ))}
