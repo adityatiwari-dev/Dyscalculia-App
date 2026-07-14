@@ -11,8 +11,8 @@ import java.util.List;
 
 public class AssessmentSyncRequest {
 
-    @NotBlank(message = "externalUserId is required")
     private String externalUserId;
+    private String userId;
 
     @Valid
     private UserProfileSyncDto userProfile;
@@ -41,11 +41,25 @@ public class AssessmentSyncRequest {
     private List<QuestionSyncDto> questions;
 
     public String getExternalUserId() {
+        if (externalUserId != null && !externalUserId.isBlank()) {
+            return externalUserId.trim();
+        }
+        if (userId != null && !userId.isBlank()) {
+            return userId.trim();
+        }
         return externalUserId;
     }
 
     public void setExternalUserId(String externalUserId) {
         this.externalUserId = externalUserId;
+    }
+
+    public String getUserId() {
+        return userId;
+    }
+
+    public void setUserId(String userId) {
+        this.userId = userId;
     }
 
     public UserProfileSyncDto getUserProfile() {

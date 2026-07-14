@@ -55,6 +55,14 @@ public class ProgressDashboardService {
     public ProgressDashboardResponse getDashboard(String externalUserId, String periodTypeStr) {
         String cleanId = externalUserId != null ? externalUserId.trim() : "";
         UserProfile user = userProfileRepository.findByExternalUserId(cleanId)
+                .or(() -> {
+                    try {
+                        return userProfileRepository.findById(java.util.UUID.fromString(cleanId));
+                    } catch (Exception e) {
+                        return java.util.Optional.empty();
+                    }
+                })
+                .or(() -> userProfileRepository.findByEmail(cleanId.toLowerCase()))
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User profile not found"));
 
         ProgressPeriodType periodType;

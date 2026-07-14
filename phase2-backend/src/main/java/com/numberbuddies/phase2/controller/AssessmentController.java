@@ -3,6 +3,7 @@ package com.numberbuddies.phase2.controller;
 import com.numberbuddies.phase2.dto.request.AssessmentSyncRequest;
 import com.numberbuddies.phase2.dto.response.AssessmentHistoryDetailResponse;
 import com.numberbuddies.phase2.dto.response.AssessmentHistorySummaryResponse;
+import com.numberbuddies.phase2.exception.ApiException;
 import com.numberbuddies.phase2.service.AssessmentHistoryService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -28,39 +29,61 @@ public class AssessmentController {
         this.assessmentHistoryService = assessmentHistoryService;
     }
 
+    private String resolveUserIdParam(String externalUserId, String userId) {
+        if (externalUserId != null && !externalUserId.isBlank()) {
+            return externalUserId.trim();
+        }
+        if (userId != null && !userId.isBlank()) {
+            return userId.trim();
+        }
+        throw new ApiException(HttpStatus.BAD_REQUEST, "externalUserId or userId is required");
+    }
+
     @PostMapping("/sync")
     public ResponseEntity<AssessmentHistoryDetailResponse> syncAssessment(
             @Valid @RequestBody AssessmentSyncRequest request
     ) {
+        if (request.getExternalUserId() == null || request.getExternalUserId().isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "externalUserId or userId is required");
+        }
         AssessmentHistoryDetailResponse response = assessmentHistoryService.syncAssessment(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping("/history")
     public ResponseEntity<List<AssessmentHistorySummaryResponse>> getHistory(
-            @RequestParam String externalUserId
+            @RequestParam(required = false) String externalUserId,
+            @RequestParam(required = false) String userId
     ) {
-        return ResponseEntity.ok(assessmentHistoryService.getHistory(externalUserId));
+        String resolvedId = resolveUserIdParam(externalUserId, userId);
+        return ResponseEntity.ok(assessmentHistoryService.getHistory(resolvedId));
     }
 
     @GetMapping("/history/{id}")
     public ResponseEntity<AssessmentHistoryDetailResponse> getAssessmentDetail(
             @PathVariable UUID id,
-            @RequestParam String externalUserId
+            @RequestParam(required = false) String externalUserId,
+            @RequestParam(required = false) String userId
     ) {
-        return ResponseEntity.ok(assessmentHistoryService.getAssessmentDetail(id, externalUserId));
+        String resolvedId = resolveUserIdParam(externalUserId, userId);
+        return ResponseEntity.ok(assessmentHistoryService.getAssessmentDetail(id, resolvedId));
     }
 
     @GetMapping("/results")
     public ResponseEntity<List<java.util.Map<String, Object>>> getDetailedResults(
             @RequestParam(required = false) String externalUserId,
+            @RequestParam(required = false) String userId,
             @RequestParam(required = false) String email
     ) {
+        String resolvedId = null;
+        if ((externalUserId != null && !externalUserId.isBlank()) || (userId != null && !userId.isBlank())) {
+            resolvedId = resolveUserIdParam(externalUserId, userId);
+        }
         org.springframework.security.core.Authentication auth =
                 org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         String authName = (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName()))
                 ? auth.getName() : null;
-        return ResponseEntity.ok(assessmentHistoryService.getDetailedResults(authName, email, externalUserId));
+        return ResponseEntity.ok(assessmentHistoryService.getDetailedResults(authName, email, resolvedId));
     }
 
     @GetMapping("/export")

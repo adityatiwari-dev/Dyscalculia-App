@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.OffsetDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 @RestController
@@ -34,14 +35,34 @@ public class AssessmentResumeController {
         this.userProfileRepository = userProfileRepository;
     }
 
-    private UserProfile resolveUser(String externalUserId) {
-        return userProfileRepository.findByExternalUserId(externalUserId)
-                .or(() -> userProfileRepository.findByEmail(externalUserId.toLowerCase()))
+    private String resolveUserIdParam(String externalUserId, String userId) {
+        if (externalUserId != null && !externalUserId.isBlank()) {
+            return externalUserId.trim();
+        }
+        if (userId != null && !userId.isBlank()) {
+            return userId.trim();
+        }
+        throw new ApiException(HttpStatus.BAD_REQUEST, "externalUserId or userId is required");
+    }
+
+    private UserProfile resolveUser(String identifier) {
+        if (identifier == null || identifier.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "externalUserId or userId is required");
+        }
+        return userProfileRepository.findByExternalUserId(identifier)
+                .or(() -> {
+                    try {
+                        return userProfileRepository.findById(UUID.fromString(identifier));
+                    } catch (Exception e) {
+                        return Optional.empty();
+                    }
+                })
+                .or(() -> userProfileRepository.findByEmail(identifier.toLowerCase()))
                 .orElseGet(() -> {
                     UserProfile created = new UserProfile();
                     created.setId(UUID.randomUUID());
-                    created.setExternalUserId(externalUserId);
-                    created.setEmail(externalUserId.contains("@") ? externalUserId.toLowerCase() : externalUserId + "@guest.numberbuddies.com");
+                    created.setExternalUserId(identifier);
+                    created.setEmail(identifier.contains("@") ? identifier.toLowerCase() : identifier + "@guest.numberbuddies.com");
                     created.setRole("student");
                     created.setName("Student");
                     return userProfileRepository.save(created);
@@ -49,8 +70,12 @@ public class AssessmentResumeController {
     }
 
     @GetMapping
-    public ResponseEntity<AssessmentProgress> getProgress(@RequestParam String externalUserId) {
-        UserProfile user = resolveUser(externalUserId);
+    public ResponseEntity<AssessmentProgress> getProgress(
+            @RequestParam(required = false) String externalUserId,
+            @RequestParam(required = false) String userId
+    ) {
+        String resolvedId = resolveUserIdParam(externalUserId, userId);
+        UserProfile user = resolveUser(resolvedId);
 
         return progressRepository.findById(user.getId())
                 .map(ResponseEntity::ok)
@@ -59,10 +84,12 @@ public class AssessmentResumeController {
 
     @PostMapping
     public ResponseEntity<AssessmentProgress> saveProgress(
-            @RequestParam String externalUserId,
+            @RequestParam(required = false) String externalUserId,
+            @RequestParam(required = false) String userId,
             @Valid @RequestBody AssessmentProgress progressRequest
     ) {
-        UserProfile user = resolveUser(externalUserId);
+        String resolvedId = resolveUserIdParam(externalUserId, userId);
+        UserProfile user = resolveUser(resolvedId);
 
         AssessmentProgress progress = progressRepository.findById(user.getId())
                 .orElseGet(() -> {
@@ -83,8 +110,12 @@ public class AssessmentResumeController {
     }
 
     @DeleteMapping
-    public ResponseEntity<Void> clearProgress(@RequestParam String externalUserId) {
-        UserProfile user = resolveUser(externalUserId);
+    public ResponseEntity<Void> clearProgress(
+            @RequestParam(required = false) String externalUserId,
+            @RequestParam(required = false) String userId
+    ) {
+        String resolvedId = resolveUserIdParam(externalUserId, userId);
+        UserProfile user = resolveUser(resolvedId);
 
         progressRepository.findById(user.getId()).ifPresent(progressRepository::delete);
         return ResponseEntity.noContent().build();

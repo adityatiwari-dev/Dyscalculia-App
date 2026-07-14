@@ -45,8 +45,13 @@ public class PracticeController {
 
     @GetMapping("/history")
     public ResponseEntity<List<PracticeSessionSummaryResponse>> history(
-            @RequestParam String externalUserId
+            @RequestParam(required = false) String externalUserId,
+            @RequestParam(required = false) String userId
     ) {
-        return ResponseEntity.ok(practiceService.getHistory(externalUserId));
+        String resolvedId = (externalUserId != null && !externalUserId.isBlank()) ? externalUserId.trim() : userId;
+        if (resolvedId == null || resolvedId.isBlank()) {
+            throw new com.numberbuddies.phase2.exception.ApiException(HttpStatus.BAD_REQUEST, "externalUserId or userId is required");
+        }
+        return ResponseEntity.ok(practiceService.getHistory(resolvedId));
     }
 }

@@ -246,7 +246,18 @@ public class PracticeService {
     }
 
     private UserProfile findUser(String externalUserId) {
+        if (externalUserId == null || externalUserId.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "externalUserId or userId is required");
+        }
         return userProfileRepository.findByExternalUserId(externalUserId)
+                .or(() -> {
+                    try {
+                        return userProfileRepository.findById(java.util.UUID.fromString(externalUserId));
+                    } catch (Exception e) {
+                        return java.util.Optional.empty();
+                    }
+                })
+                .or(() -> userProfileRepository.findByEmail(externalUserId.toLowerCase()))
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User profile not found"));
     }
 
