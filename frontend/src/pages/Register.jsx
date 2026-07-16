@@ -42,22 +42,36 @@ export default function Register() {
   const handleAgeChange = (e) => {
     const val = e.target.value
     setAge(val)
-    if (fieldErrors.age) {
-      const { isValid } = validateStudentAge(val)
-      if (isValid) {
-        setFieldErrors((prev) => ({ ...prev, age: '' }))
-      }
+    if (role === 'student' && val.trim() !== '') {
+      const { isValid, error } = validateStudentAge(val)
+      setFieldErrors((prev) => ({ ...prev, age: isValid ? '' : error }))
+    } else if (fieldErrors.age && val.trim() === '') {
+      setFieldErrors((prev) => ({ ...prev, age: 'Age must be between 5 and 10 years to register.' }))
+    }
+  }
+
+  const handleAgeBlur = () => {
+    if (role === 'student') {
+      const { isValid, error } = validateStudentAge(age)
+      setFieldErrors((prev) => ({ ...prev, age: isValid ? '' : error }))
     }
   }
 
   const handleGradeChange = (e) => {
     const val = e.target.value
     setGrade(val)
-    if (fieldErrors.grade) {
-      const { isValid } = validateStudentGrade(val)
-      if (isValid) {
-        setFieldErrors((prev) => ({ ...prev, grade: '' }))
-      }
+    if (role === 'student' && val.trim() !== '') {
+      const { isValid, error } = validateStudentGrade(val)
+      setFieldErrors((prev) => ({ ...prev, grade: isValid ? '' : error }))
+    } else if (fieldErrors.grade && val.trim() === '') {
+      setFieldErrors((prev) => ({ ...prev, grade: 'Please enter a valid grade.' }))
+    }
+  }
+
+  const handleGradeBlur = () => {
+    if (role === 'student') {
+      const { isValid, error } = validateStudentGrade(grade)
+      setFieldErrors((prev) => ({ ...prev, grade: isValid ? '' : error }))
     }
   }
 
@@ -237,6 +251,7 @@ export default function Register() {
                   <input
                     value={age}
                     onChange={handleAgeChange}
+                    onBlur={handleAgeBlur}
                     placeholder="e.g. 8"
                     type="number"
                     min="5"
@@ -258,6 +273,7 @@ export default function Register() {
                   <input
                     value={grade}
                     onChange={handleGradeChange}
+                    onBlur={handleGradeBlur}
                     placeholder="e.g. Grade 3"
                     className={`w-full p-3.5 rounded-2xl border bg-white text-black placeholder-gray-400 focus:outline-none focus:ring-2 transition ${
                       fieldErrors.grade
