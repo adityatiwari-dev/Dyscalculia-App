@@ -4,6 +4,7 @@ import client from '../api/springClient'
 import { setToken, setUser } from '../auth'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorBanner from '../components/ErrorBanner'
+import { validateStudentAge, validateStudentGrade } from '../utils/studentValidation'
 
 export default function Register() {
   const [role, setRole] = useState('student')
@@ -27,6 +28,7 @@ export default function Register() {
   const [consent, setConsent] = useState(true)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({})
   const [loading, setLoading] = useState(false)
 
   const navigate = useNavigate()
@@ -34,11 +36,35 @@ export default function Register() {
   const handleRoleChange = (newRole) => {
     setRole(newRole)
     setError('')
+    setFieldErrors({})
+  }
+
+  const handleAgeChange = (e) => {
+    const val = e.target.value
+    setAge(val)
+    if (fieldErrors.age) {
+      const { isValid } = validateStudentAge(val)
+      if (isValid) {
+        setFieldErrors((prev) => ({ ...prev, age: '' }))
+      }
+    }
+  }
+
+  const handleGradeChange = (e) => {
+    const val = e.target.value
+    setGrade(val)
+    if (fieldErrors.grade) {
+      const { isValid } = validateStudentGrade(val)
+      if (isValid) {
+        setFieldErrors((prev) => ({ ...prev, grade: '' }))
+      }
+    }
   }
 
   const submit = async (e) => {
     e.preventDefault()
     setError('')
+    setFieldErrors({})
     setLoading(true)
 
     try {
@@ -49,6 +75,20 @@ export default function Register() {
       }
       if (!consent) {
         throw { clientValidation: true, message: 'Consent is required to create an account' }
+      }
+
+      if (role === 'student') {
+        const ageCheck = validateStudentAge(age)
+        const gradeCheck = validateStudentGrade(grade)
+        const newFieldErrors = {}
+        if (!ageCheck.isValid) newFieldErrors.age = ageCheck.error
+        if (!gradeCheck.isValid) newFieldErrors.grade = gradeCheck.error
+
+        if (Object.keys(newFieldErrors).length > 0) {
+          setFieldErrors(newFieldErrors)
+          setLoading(false)
+          return
+        }
       }
 
       // Build payload matching role requirements and API expectations
@@ -94,11 +134,15 @@ export default function Register() {
       if (err?.clientValidation) {
         setError(err.message)
       } else {
-        setError(
+        const backendErrors = err.response?.data?.errors || err.response?.data?.fieldErrors
+        if (backendErrors && typeof backendErrors === 'object') {
+          setFieldErrors((prev) => ({ ...prev, ...backendErrors }))
+        }
+        const backendMsg =
           err.response?.data?.message ||
           (typeof err.response?.data === 'string' ? err.response?.data : null) ||
           'Registration failed. Please check your information.'
-        )
+        setError(backendMsg)
       }
     } finally {
       setLoading(false)
@@ -192,13 +236,20 @@ export default function Register() {
                   </label>
                   <input
                     value={age}
-                    onChange={(e) => setAge(e.target.value)}
+                    onChange={handleAgeChange}
                     placeholder="e.g. 8"
                     type="number"
-                    min="4"
-                    max="18"
-                    className="w-full p-3.5 rounded-2xl border border-gray-300 bg-white text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary transition"
+                    min="5"
+                    max="10"
+                    className={`w-full p-3.5 rounded-2xl border bg-white text-black placeholder-gray-400 focus:outline-none focus:ring-2 transition ${
+                      fieldErrors.age
+                        ? 'border-red-500 focus:ring-red-500 bg-red-50/20'
+                        : 'border-gray-300 focus:ring-primary'
+                    }`}
                   />
+                  {fieldErrors.age && (
+                    <p className="text-xs text-red-600 font-bold mt-1.5">{fieldErrors.age}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
@@ -206,10 +257,17 @@ export default function Register() {
                   </label>
                   <input
                     value={grade}
-                    onChange={(e) => setGrade(e.target.value)}
+                    onChange={handleGradeChange}
                     placeholder="e.g. Grade 3"
-                    className="w-full p-3.5 rounded-2xl border border-gray-300 bg-white text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary transition"
+                    className={`w-full p-3.5 rounded-2xl border bg-white text-black placeholder-gray-400 focus:outline-none focus:ring-2 transition ${
+                      fieldErrors.grade
+                        ? 'border-red-500 focus:ring-red-500 bg-red-50/20'
+                        : 'border-gray-300 focus:ring-primary'
+                    }`}
                   />
+                  {fieldErrors.grade && (
+                    <p className="text-xs text-red-600 font-bold mt-1.5">{fieldErrors.grade}</p>
+                  )}
                 </div>
               </div>
 

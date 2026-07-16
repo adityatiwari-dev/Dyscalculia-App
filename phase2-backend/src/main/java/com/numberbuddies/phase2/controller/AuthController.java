@@ -59,6 +59,15 @@ public class AuthController {
         if ("admin".equals(requestedRole) || "role_admin".equals(requestedRole)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "Admin accounts cannot be created via public registration");
         }
+
+        if ("student".equals(requestedRole)) {
+            if (request.getAge() == null || request.getAge() < 5 || request.getAge() > 10) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Age must be between 5 and 10 years to register.");
+            }
+            if (request.getGrade() == null || request.getGrade().isBlank() || !isValidStudentGrade(request.getGrade())) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Please enter a valid grade.");
+            }
+        }
         user.setRole(requestedRole);
 
         // Set externalUserId dynamically to support unified database schema compatibility
@@ -101,5 +110,13 @@ public class AuthController {
         response.setStudentCode(user.getStudentCode());
 
         return ResponseEntity.ok(response);
+    }
+
+    private boolean isValidStudentGrade(String grade) {
+        if (grade == null || grade.isBlank()) {
+            return false;
+        }
+        String g = grade.trim().toLowerCase();
+        return g.matches("^(0|k|kg|lkg|ukg|kindergarten|grade\\s*k|grade\\s*0|[1-5]|grade\\s*[1-5]|[1-5](st|nd|rd|th)|(first|second|third|fourth|fifth)(\\s*grade)?|grade\\s*[1-5](st|nd|rd|th))$");
     }
 }
