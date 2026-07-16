@@ -72,16 +72,22 @@ public class UserService {
         if (request.getName() != null) user.setName(request.getName());
         if (request.getAge() != null) user.setAge(request.getAge());
         if (request.getGrade() != null) user.setGrade(request.getGrade());
-        if (request.getRole() != null) user.setRole(request.getRole());
+        if (request.getRole() != null && !request.getRole().isBlank()) {
+            String role = request.getRole().trim().toLowerCase();
+            if (role.startsWith("role_")) role = role.substring(5);
+            user.setRole(role);
+        }
 
         return userProfileRepository.save(user);
     }
 
     private boolean isRoleMatch(String actualRole, String expectedRole) {
-        if (actualRole == null) return false;
-        String clean = actualRole.trim().toLowerCase();
-        String expectedClean = expectedRole.trim().toLowerCase();
-        return clean.equals(expectedClean) || clean.equals("role_" + expectedClean);
+        if (actualRole == null || expectedRole == null) return false;
+        String cleanActual = actualRole.trim().toLowerCase();
+        if (cleanActual.startsWith("role_")) cleanActual = cleanActual.substring(5);
+        String cleanExpected = expectedRole.trim().toLowerCase();
+        if (cleanExpected.startsWith("role_")) cleanExpected = cleanExpected.substring(5);
+        return cleanActual.equals(cleanExpected);
     }
 
     @Transactional

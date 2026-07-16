@@ -28,7 +28,11 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
 
         // Use the role defined in UserProfile as the Authority (e.g. ROLE_STUDENT or ROLE_PARENT)
-        String userRole = "ROLE_" + userProfile.getRole().toUpperCase();
+        String rawRole = userProfile.getRole() != null ? userProfile.getRole().trim().toUpperCase() : "STUDENT";
+        if (rawRole.startsWith("ROLE_")) {
+            rawRole = rawRole.substring(5);
+        }
+        String userRole = "ROLE_" + rawRole;
 
         return new User(
                 userProfile.getEmail(),

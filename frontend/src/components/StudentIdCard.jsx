@@ -5,8 +5,9 @@ export default function StudentIdCard({ student, className = '' }) {
 
   if (!student) return null
 
-  // Resolve unique Student ID code
-  const studentCode = student.studentCode || (student._id ? `NB-${String(student._id).replace(/-/g, '').slice(0, 6).toUpperCase()}` : 'NB-STUDENT')
+  // Resolve unique Student ID code matching backend UserProfile derivation
+  const resolvedId = student.externalUserId || student._id || student.id || ''
+  const studentCode = student.studentCode || (resolvedId ? `NB-${String(resolvedId).replace(/-/g, '').slice(0, 6).toUpperCase()}` : 'NB-STUDENT')
 
   const handleCopy = () => {
     navigator.clipboard.writeText(studentCode)

@@ -73,7 +73,13 @@ public class UserProfile {
         createdAt = now;
         updatedAt = now;
         if (studentCode == null && "student".equalsIgnoreCase(role)) {
-            studentCode = "NB-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+            if (externalUserId != null && externalUserId.length() >= 6) {
+                studentCode = "NB-" + externalUserId.substring(0, 6).toUpperCase();
+            } else if (id != null) {
+                studentCode = "NB-" + id.toString().substring(0, 6).toUpperCase();
+            } else {
+                studentCode = "NB-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+            }
         }
     }
 
@@ -83,8 +89,12 @@ public class UserProfile {
     }
 
     public String getStudentCode() {
-        if (studentCode == null && "student".equalsIgnoreCase(role) && id != null) {
-            return "NB-" + id.toString().substring(0, 6).toUpperCase();
+        if (studentCode == null && "student".equalsIgnoreCase(role)) {
+            if (externalUserId != null && externalUserId.length() >= 6) {
+                return "NB-" + externalUserId.substring(0, 6).toUpperCase();
+            } else if (id != null) {
+                return "NB-" + id.toString().substring(0, 6).toUpperCase();
+            }
         }
         return studentCode;
     }
@@ -146,7 +156,13 @@ public class UserProfile {
     }
 
     public void setRole(String role) {
-        this.role = role;
+        if (role != null && role.toLowerCase().startsWith("role_")) {
+            this.role = role.substring(5).toLowerCase();
+        } else if (role != null) {
+            this.role = role.toLowerCase();
+        } else {
+            this.role = "student";
+        }
     }
 
     public OffsetDateTime getCreatedAt() {

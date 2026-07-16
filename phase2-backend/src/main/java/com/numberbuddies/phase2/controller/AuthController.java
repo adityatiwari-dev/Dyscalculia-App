@@ -39,11 +39,13 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
-        if (userProfileRepository.findByEmail(request.getEmail().toLowerCase()).isPresent()) {
+        UserProfile user = userProfileRepository.findByEmail(request.getEmail().toLowerCase())
+                .orElseGet(UserProfile::new);
+
+        if (user.getPassword() != null && !user.getPassword().isBlank()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "User already exists");
         }
 
-        UserProfile user = new UserProfile();
         user.setEmail(request.getEmail().toLowerCase());
         user.setName(request.getName());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
@@ -56,7 +58,8 @@ public class AuthController {
             user.setConsentDate(OffsetDateTime.now());
         }
         String requestedRole = request.getRole() != null && !request.getRole().isBlank() ? request.getRole().trim().toLowerCase() : "student";
-        if ("admin".equals(requestedRole) || "role_admin".equals(requestedRole)) {
+        if (requestedRole.startsWith("role_")) requestedRole = requestedRole.substring(5);
+        if ("admin".equals(requestedRole)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "Admin accounts cannot be created via public registration");
         }
 
@@ -70,22 +73,25 @@ public class AuthController {
         }
         user.setRole(requestedRole);
 
-        // Set externalUserId dynamically to support unified database schema compatibility
-        UUID newId = UUID.randomUUID();
-        user.setId(newId);
-        user.setExternalUserId(newId.toString());
+        if (user.getExternalUserId() == null || user.getExternalUserId().isBlank()) {
+            user.setExternalUserId(UUID.randomUUID().toString());
+        }
 
-        userProfileRepository.save(user);
+        UserProfile savedUser = userProfileRepository.save(user);
+        if (savedUser.getExternalUserId() == null || savedUser.getExternalUserId().isBlank()) {
+            savedUser.setExternalUserId(savedUser.getId() != null ? savedUser.getId().toString() : UUID.randomUUID().toString());
+            savedUser = userProfileRepository.save(savedUser);
+        }
 
-        String token = jwtTokenProvider.generateToken(user.getEmail());
+        String token = jwtTokenProvider.generateToken(savedUser.getEmail());
 
         AuthResponse response = new AuthResponse();
-        response.setId(user.getExternalUserId());
-        response.setName(user.getName());
-        response.setEmail(user.getEmail());
-        response.setRole(user.getRole());
+        response.setId(savedUser.getExternalUserId());
+        response.setName(savedUser.getName());
+        response.setEmail(savedUser.getEmail());
+        response.setRole(savedUser.getRole());
         response.setToken(token);
-        response.setStudentCode(user.getStudentCode());
+        response.setStudentCode(savedUser.getStudentCode());
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
