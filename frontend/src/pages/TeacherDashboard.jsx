@@ -66,19 +66,8 @@ export default function TeacherDashboard() {
   // Student Observations state
   const [observations, setObservations] = useState([])
   const [allParentObservations, setAllParentObservations] = useState([])
-  const [teacherActions, setTeacherActions] = useState({})
   const [newObservationText, setNewObservationText] = useState('')
   const [submittingNote, setSubmittingNote] = useState(false)
-
-  const toggleTeacherAction = (obsId, actionKey) => {
-    setTeacherActions(prev => ({
-      ...prev,
-      [obsId]: {
-        ...prev[obsId],
-        [actionKey]: !prev[obsId]?.[actionKey]
-      }
-    }))
-  }
 
   const teacher = getUser()
 
@@ -486,37 +475,8 @@ export default function TeacherDashboard() {
                     "{obs.observationText}"
                   </p>
 
-                  <div className="pt-2 border-t border-gray-100">
-                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-2">Teacher Action</span>
-                    <div className="flex flex-wrap gap-4 text-xs font-semibold text-gray-700">
-                      <label className="flex items-center gap-2 cursor-pointer hover:text-primary transition">
-                        <input
-                          type="checkbox"
-                          checked={teacherActions[obs.id]?.reviewed || false}
-                          onChange={() => toggleTeacherAction(obs.id, 'reviewed')}
-                          className="w-4 h-4 rounded text-primary border-gray-300 focus:ring-primary"
-                        />
-                        <span>Reviewed</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer hover:text-primary transition">
-                        <input
-                          type="checkbox"
-                          checked={teacherActions[obs.id]?.discuss || false}
-                          onChange={() => toggleTeacherAction(obs.id, 'discuss')}
-                          className="w-4 h-4 rounded text-primary border-gray-300 focus:ring-primary"
-                        />
-                        <span>Discuss with Parent</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer hover:text-primary transition">
-                        <input
-                          type="checkbox"
-                          checked={teacherActions[obs.id]?.recommend || false}
-                          onChange={() => toggleTeacherAction(obs.id, 'recommend')}
-                          className="w-4 h-4 rounded text-primary border-gray-300 focus:ring-primary"
-                        />
-                        <span>Add Recommendation</span>
-                      </label>
-                    </div>
+                  <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
+                    <span className="text-xs font-semibold text-gray-500">Status: <strong className="text-green-700 bg-green-50 px-2 py-0.5 rounded-md border border-green-200">Observation Received</strong></span>
                   </div>
                 </div>
               ))}
@@ -723,37 +683,8 @@ export default function TeacherDashboard() {
                               <span className="text-xs text-gray-400">📅 {formatDate(obs.createdAt)}</span>
                             </div>
                             <p className="text-sm text-gray-700 leading-relaxed font-medium italic bg-gray-50 p-3 rounded-xl">"{obs.observationText}"</p>
-                            <div className="pt-2 border-t border-gray-100">
-                              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-2">Teacher Action</span>
-                              <div className="flex flex-wrap gap-4 text-xs font-semibold text-gray-700">
-                                <label className="flex items-center gap-2 cursor-pointer hover:text-primary transition">
-                                  <input
-                                    type="checkbox"
-                                    checked={teacherActions[obs.id]?.reviewed || false}
-                                    onChange={() => toggleTeacherAction(obs.id, 'reviewed')}
-                                    className="w-4 h-4 rounded text-primary border-gray-300 focus:ring-primary"
-                                  />
-                                  <span>Reviewed</span>
-                                </label>
-                                <label className="flex items-center gap-2 cursor-pointer hover:text-primary transition">
-                                  <input
-                                    type="checkbox"
-                                    checked={teacherActions[obs.id]?.discuss || false}
-                                    onChange={() => toggleTeacherAction(obs.id, 'discuss')}
-                                    className="w-4 h-4 rounded text-primary border-gray-300 focus:ring-primary"
-                                  />
-                                  <span>Discuss with Parent</span>
-                                </label>
-                                <label className="flex items-center gap-2 cursor-pointer hover:text-primary transition">
-                                  <input
-                                    type="checkbox"
-                                    checked={teacherActions[obs.id]?.recommend || false}
-                                    onChange={() => toggleTeacherAction(obs.id, 'recommend')}
-                                    className="w-4 h-4 rounded text-primary border-gray-300 focus:ring-primary"
-                                  />
-                                  <span>Add Recommendation</span>
-                                </label>
-                              </div>
+                            <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
+                              <span className="text-xs font-semibold text-gray-500">Status: <strong className="text-green-700 bg-green-50 px-2 py-0.5 rounded-md border border-green-200">Observation Received</strong></span>
                             </div>
                           </div>
                         ))}
